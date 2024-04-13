@@ -1,0 +1,7 @@
+region,tech,cost_capital,cost_generation,size
+A,Gas CT,80000,30,55
+B,Gas CT,80000,30,55
+C,Gas CT,80000,30,55
+A,Gas CC,93400,20,355
+B,Gas CC,93400,20,355
+C,Gas CC,93400,20,355

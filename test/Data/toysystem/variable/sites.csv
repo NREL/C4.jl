@@ -1,0 +1,6 @@
+region,tech,site,capacity_existing,capacity_new_max
+A,Wind,,0,100
+C,Wind,,0,100
+A,Solar PV,,0,100
+B,Solar PV,,0,100
+C,Solar PV,,0,100
