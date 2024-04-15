@@ -1,7 +1,7 @@
 region,tech,site,units_existing,units_new_max
-A,Gas CC,,0,10
+A,Gas CC,,1,10
 B,Gas CC,,0,10
 C,Gas CC,,0,10
 A,Gas CT,,0,10
 B,Gas CT,,0,10
-C,Gas CT,,0,10
+C,Gas CT,,1,10

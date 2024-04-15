@@ -1,3 +1,3 @@
 region,tech,site,power_existing,power_new_max,energy_existing,energy_new_max
 A,Lithium Ion,,0,10,0,100
-B,Lithium Ion,,0,10,0,100
+B,Lithium Ion,,5,10,20,100
