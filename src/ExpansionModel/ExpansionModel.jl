@@ -1,6 +1,7 @@
 module ExpansionModel
 
-using JuMP
+import JuMP
+import JuMP: @variable, @constraint, @expression
 
 using ..Data
 
@@ -12,7 +13,7 @@ export fullchronology, ExpansionProblem
 
 mutable struct ExpansionProblem
 
-    model::Model
+    model::JuMP.Model
 
     system::System
 
@@ -36,7 +37,7 @@ mutable struct ExpansionProblem
         timestepcount(reliability_periods) == n_timesteps ||
             error("Reliability period assignment is incompatible with system timesteps")
 
-        m = Model(optimizer)
+        m = JuMP.Model(optimizer)
 
         regions = [RegionBuild(m, r) for r in system.regions]
         interfaces = [InterfaceBuild(m, i) for i in system.interfaces]
