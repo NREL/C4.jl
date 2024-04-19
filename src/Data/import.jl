@@ -69,8 +69,8 @@ function load_interfaces(datadir::String, regions::Vector{Region})
         name = string(data[i,1])
         region_from = string(data[i,2])
         region_to = string(data[i,3])
-        cost_capital = Float64(data[i,5])
-        capacity_existing = Float64(data[i,4])
+        cost_capital = Float64(data[i,4])
+        capacity_existing = Float64(data[i,5])
         capacity_new_max = Float64(data[i,6])
 
         region_from = getbyname(regions, region_from)
@@ -269,8 +269,8 @@ function load_storagesites!(system::System, datadir::String)
         power_existing = Float64(sites[r, 4])
         power_new_max = Float64(sites[r, 5])
 
-        energy_existing = Float64(sites[r, 4])
-        energy_new_max = Float64(sites[r, 5])
+        energy_existing = Float64(sites[r, 6])
+        energy_new_max = Float64(sites[r, 7])
 
         site = StorageSite(
             sitename, power_existing, power_new_max,
