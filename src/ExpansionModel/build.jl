@@ -42,6 +42,33 @@ end
 
 sitebuildtype(::Type{VariableTechnology}) = VariableSiteBuild
 
+struct StorageSiteBuild <: ResourceSiteBuild
+
+    params::StorageSite
+    power_new::JuMP.VariableRef
+    energy_new::JuMP.VariableRef
+
+    function StorageSiteBuild(
+        m::JuMP.Model, siteparams::StorageSite,
+        techparams::StorageTechnology, regionparams::Region
+    )
+
+        fullname = join([regionparams.name, techparams.name, siteparams.name], ",")
+
+        power_new = @variable(m, lower_bound=0, upper_bound=siteparams.power_new_max)
+        JuMP.set_name(power_new, "storage_new_power[$fullname]")
+
+        energy_new = @variable(m, lower_bound=0, upper_bound=siteparams.energy_new_max)
+        JuMP.set_name(energy_new, "storage_new_energy[$fullname]")
+
+        new(siteparams, power_new, energy_new)
+
+    end
+
+end
+
+sitebuildtype(::Type{StorageTechnology}) = StorageSiteBuild
+
 struct TechnologyBuild{T<:ResourceTechnology,B<:ResourceSiteBuild}
 
     params::T
@@ -68,6 +95,7 @@ struct RegionBuild
 
     thermaltechs::Vector{TechnologyBuild{ThermalTechnology}}
     variabletechs::Vector{TechnologyBuild{VariableTechnology}}
+    storagetechs::Vector{TechnologyBuild{StorageTechnology}}
 
     function RegionBuild(m::JuMP.Model, regionparams::Region)
 
@@ -77,7 +105,10 @@ struct RegionBuild
         variabletechs = [TechnologyBuild(m, techparams, regionparams)
                         for techparams in regionparams.variabletechs]
 
-        new(regionparams, thermaltechs, variabletechs)
+        storagetechs = [TechnologyBuild(m, techparams, regionparams)
+                        for techparams in regionparams.storagetechs]
+
+        new(regionparams, thermaltechs, variabletechs, storagetechs)
 
     end
 
