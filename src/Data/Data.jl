@@ -4,11 +4,6 @@ using Dates, DelimitedFiles
 
 import Base: length
 
-# TimePeriod: continguous grouping of timesteps: name and integer range
-# [Ecnomic,Adequacy]Dispatch: Spatiotemporal collection of dispatch decisions associated with one or more equal-length TimePeriods - includes RegionDispatches, InterfaceDispatches, any potential adequacy construct
-# DispatchRecurrence: Finite repetition of Dispatch actions. Corresponds to a set of sequential TimePeriods. Includes start/end conditions
-# DispatchSequence: Chain of DispatchRecurrences with linking constraints between start/end conditions
-
 export GenerationTechnology, Generator, GeneratorBuild, GeneratorDispatch,
        StorageTechnology, Storage, StorageBuild, StorageDispatch,
        Region, RegionDispatch,
