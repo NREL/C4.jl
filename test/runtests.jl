@@ -29,3 +29,4 @@ fullchrono = fullchronology(sys, daylength=2)
 
 
 @time cem = ExpansionProblem(sys, fullchrono, fullchrono, HiGHS.Optimizer)
+println(cem.model)
