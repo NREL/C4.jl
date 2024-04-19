@@ -1,4 +1,6 @@
-struct ThermalSiteBuild
+abstract type ResourceSiteBuild end
+
+struct ThermalSiteBuild <: ResourceSiteBuild
 
     params::ThermalSite
     units_new::JuMP.VariableRef
@@ -17,24 +19,9 @@ struct ThermalSiteBuild
 
 end
 
-struct ThermalTechnologyBuild
+sitebuildtype(::Type{ThermalTechnology}) = ThermalSiteBuild
 
-    params::ThermalTechnology
-    sites::Vector{ThermalSiteBuild}
-
-    function ThermalTechnologyBuild(
-        m::JuMP.Model, techparams::ThermalTechnology, regionparams::Region
-    )
-
-        sites = [ThermalSiteBuild(m, siteparams, techparams, regionparams)
-                 for siteparams in techparams.sites]
-        new(techparams, sites)
-
-    end
-
-end
-
-struct VariableSiteBuild
+struct VariableSiteBuild <: ResourceSiteBuild
 
     params::VariableSite
     capacity_new::JuMP.VariableRef
@@ -53,18 +40,23 @@ struct VariableSiteBuild
 
 end
 
-struct VariableTechnologyBuild
+sitebuildtype(::Type{VariableTechnology}) = VariableSiteBuild
 
-    params::VariableTechnology
-    sites::Vector{VariableSiteBuild}
+struct TechnologyBuild{T<:ResourceTechnology,B<:ResourceSiteBuild}
 
-    function VariableTechnologyBuild(
-        m::JuMP.Model, techparams::VariableTechnology, regionparams::Region
-    )
+    params::T
+    sites::Vector{B}
 
-        sites = [VariableSiteBuild(m, siteparams, techparams, regionparams)
+    function TechnologyBuild(
+        m::JuMP.Model, techparams::T, regionparams::Region
+    ) where T <: ResourceTechnology
+
+        B = sitebuildtype(T)
+
+        sites = [B(m, siteparams, techparams, regionparams)
                  for siteparams in techparams.sites]
-        new(techparams, sites)
+
+        new{T,B}(techparams, sites)
 
     end
 
@@ -74,15 +66,15 @@ struct RegionBuild
 
     params::Region
 
-    thermaltechs::Vector{ThermalTechnologyBuild}
-    variabletechs::Vector{VariableTechnologyBuild}
+    thermaltechs::Vector{TechnologyBuild{ThermalTechnology}}
+    variabletechs::Vector{TechnologyBuild{VariableTechnology}}
 
     function RegionBuild(m::JuMP.Model, regionparams::Region)
 
-        thermaltechs = [ThermalTechnologyBuild(m, techparams, regionparams)
+        thermaltechs = [TechnologyBuild(m, techparams, regionparams)
                         for techparams in regionparams.thermaltechs]
 
-        variabletechs = [VariableTechnologyBuild(m, techparams, regionparams)
+        variabletechs = [TechnologyBuild(m, techparams, regionparams)
                         for techparams in regionparams.variabletechs]
 
         new(regionparams, thermaltechs, variabletechs)

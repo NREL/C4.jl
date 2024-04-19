@@ -4,7 +4,8 @@ using Dates, DelimitedFiles
 
 import Base: length
 
-export Region, ThermalTechnology, ThermalSite, VariableTechnology, VariableSite,
+export Region, ResourceTechnology,
+       ThermalTechnology, ThermalSite, VariableTechnology, VariableSite,
        StorageTechnology, StorageSite, Interface, System
 
 include("resources.jl")
