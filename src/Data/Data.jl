@@ -4,10 +4,11 @@ using Dates, DelimitedFiles
 
 import Base: length
 
-export Region, ResourceTechnology,
+export availability, TimePeriod, Region, ResourceTechnology,
        ThermalTechnology, ThermalSite, VariableTechnology, VariableSite,
        StorageTechnology, StorageSite, Interface, System
 
+include("time.jl")
 include("resources.jl")
 
 include("import_validation.jl")

@@ -1,11 +1,6 @@
-struct TimePeriod
-    timesteps::UnitRange{Int}
-    name::String
-end
-
 struct TimeProxyAssignment
     daylength::Int
-    timeperiods::Vector{TimePeriod} # set of all TimePeriods
+    periods::Vector{TimePeriod} # set of all TimePeriods
     days::Vector{TimePeriod} # mapping from days to TimePeriods
 end
 
@@ -15,12 +10,12 @@ end
 
 function fullchronology(sys::System; daylength::Int=24)
     n_days = daycount(sys, daylength)
-    timeperiods = [TimePeriod(((d-1)*daylength+1):(d*daylength), "Day $d") for d in 1:n_days]
-    return TimeProxyAssignment(daylength, timeperiods, timeperiods)
+    periods = [TimePeriod(((d-1)*daylength+1):(d*daylength), "Day $d") for d in 1:n_days]
+    return TimeProxyAssignment(daylength, periods, periods)
 end
 
 function add_period!(tpa::TimeProxyAssignment, tp::TimePeriod, ds::Vector{Int})
-    push!(tpa.timeperiods, tp)
+    push!(tpa.periods, tp)
     days[ds] = tp
     return
 end

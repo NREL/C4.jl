@@ -13,6 +13,8 @@ struct ThermalSite <: ResourceSite
 
 end
 
+availability(site::ThermalSite, t::Int) = site.μ[t] / (site.λ[t] + site.μ[t])
+
 struct ThermalTechnology <: ResourceTechnology
 
     name::String
@@ -20,11 +22,12 @@ struct ThermalTechnology <: ResourceTechnology
     cost_capital::Float64 # $/MW
     cost_generation::Float64 # $/MWh
 
-    size::Int # MW/unit
+    unit_size::Int # MW/unit
 
     sites::Vector{ThermalSite}
 
 end
+
 
 struct VariableSite <: ResourceSite
 
@@ -36,6 +39,8 @@ struct VariableSite <: ResourceSite
     availability::Vector{Float64}
 
 end
+
+availability(site::VariableSite, t::Int) = site.availability[t]
 
 struct VariableTechnology <: ResourceTechnology
 

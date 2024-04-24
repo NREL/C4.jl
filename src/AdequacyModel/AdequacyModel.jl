@@ -82,7 +82,7 @@ function load_generators(sys::System, meta)
                     g_last += 1
                     names[g_last] = sitename * "_$i"
                     categories[g_last] = tech.name
-                    capacity[g_last, :] .= tech.size
+                    capacity[g_last, :] .= tech.unit_size
                     lambda[g_last, :] .= site.λ
                     mu[g_last, :] .= site.μ
                 end

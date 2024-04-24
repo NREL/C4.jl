@@ -3,8 +3,12 @@ module ExpansionModel
 import JuMP
 import JuMP: @variable, @constraint, @expression
 
+import MathOptInterface
+const MOI = MathOptInterface
+
 using ..Data
 
+include("jump_utils.jl")
 include("build.jl")
 include("time.jl")
 include("dispatch.jl")
@@ -17,8 +21,7 @@ mutable struct ExpansionProblem
 
     system::System
 
-    regions::Vector{RegionBuild}
-    interfaces::Vector{InterfaceBuild}
+    builds::Builds
 
     economicdispatch::DispatchSequence{EconomicDispatch}
     reliabilitydispatch::DispatchSequence{ReliabilityDispatch}
@@ -39,13 +42,17 @@ mutable struct ExpansionProblem
 
         m = JuMP.Model(optimizer)
 
-        regions = [RegionBuild(m, r) for r in system.regions]
-        interfaces = [InterfaceBuild(m, i) for i in system.interfaces]
+        builds = Builds(
+            [RegionBuild(m, r) for r in system.regions],
+            [InterfaceBuild(m, i) for i in system.interfaces])
 
-        economicdispatch = DispatchSequence{EconomicDispatch}(system, economic_periods)
-        reliabilitydispatch = DispatchSequence{ReliabilityDispatch}(system, reliability_periods)
+        economicdispatch = DispatchSequence{EconomicDispatch}(
+            m, builds, economic_periods)
 
-        return new(m, system, regions, interfaces, economicdispatch, reliabilitydispatch)
+        reliabilitydispatch = DispatchSequence{ReliabilityDispatch}(
+            m, builds, reliability_periods)
+
+        return new(m, system, builds, economicdispatch, reliabilitydispatch)
 
     end
 

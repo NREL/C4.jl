@@ -89,6 +89,27 @@ struct TechnologyBuild{T<:ResourceTechnology,B<:ResourceSiteBuild}
 
 end
 
+const ThermalBuild = TechnologyBuild{ThermalTechnology}
+const VariableBuild = TechnologyBuild{VariableTechnology}
+const GeneratorBuild = TechnologyBuild{<:Union{ThermalTechnology,VariableTechnology}}
+const StorageBuild = TechnologyBuild{StorageTechnology}
+
+availablecapacity(build::ThermalBuild, t::Int) = sum(
+        (site.params.units_existing + site.units_new) * build.params.unit_size
+        * availability(site.params, t)
+        for site in build.sites)
+
+availablecapacity(build::VariableBuild, t::Int) = sum(
+        (site.params.capacity_existing + site.capacity_new)
+        * availability(site.params, t)
+        for site in build.sites)
+
+maxpower(build::StorageBuild) = sum(
+    site.params.power_existing + site.power_new for site in build.sites)
+
+maxenergy(build::StorageBuild) = sum(
+    site.params.energy_existing + site.energy_new for site in build.sites)
+
 struct RegionBuild
 
     params::Region
@@ -129,4 +150,9 @@ struct InterfaceBuild
 
     end
 
+end
+
+struct Builds
+     regions::Vector{RegionBuild}
+     interfaces::Vector{InterfaceBuild}
 end
