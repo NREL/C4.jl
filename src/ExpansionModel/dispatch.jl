@@ -107,7 +107,10 @@ struct RegionEconomicDispatch
     export_interfaces::Vector{InterfaceDispatch}
 
     function RegionEconomicDispatch(
-        m::JuMP.Model, regionbuild::RegionBuild, period::TimePeriod
+        m::JuMP.Model,
+        regionbuild::RegionBuild,
+        interfaces::Vector{InterfaceDispatch},
+        period::TimePeriod
     )
 
         T = length(period)
@@ -126,9 +129,8 @@ struct RegionEconomicDispatch
                 - sum(tech.dispatch[t] for tech in variabledispatch)
                 - sum(tech.dispatch[t] for tech in storagedispatch))
 
-        # TODO - revamp regions to store interface indices rather than references
-        import_interfaces = InterfaceDispatch[]
-        export_interfaces = InterfaceDispatch[]
+        import_interfaces = [interfaces[i] for i in regionbuild.params.import_interfaces]
+        export_interfaces = [interfaces[i] for i in regionbuild.params.export_interfaces]
 
         new(thermaldispatch, variabledispatch, storagedispatch,
             netload, import_interfaces, export_interfaces)
@@ -152,11 +154,11 @@ struct EconomicDispatch <: Dispatch
         T = length(period)
         R = length(builds.regions)
 
-        regions = [RegionEconomicDispatch(m, region, period)
-                   for region in builds.regions]
-
         interfaces = [InterfaceDispatch(m, iface, period)
                    for iface in builds.interfaces]
+
+        regions = [RegionEconomicDispatch(m, region, interfaces, period)
+                   for region in builds.regions]
 
         netimports = @expression(m, [r in 1:R, t in 1:T],
            sum(iface.flow[t] for iface in regions[r].import_interfaces) -

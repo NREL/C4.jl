@@ -66,6 +66,8 @@ function load_interfaces(datadir::String, regions::Vector{Region})
 
     for i in 2:size(data, 1)
 
+        iface_idx = i-1
+
         name = string(data[i,1])
         region_from = string(data[i,2])
         region_to = string(data[i,3])
@@ -80,8 +82,8 @@ function load_interfaces(datadir::String, regions::Vector{Region})
             name, region_from, region_to, cost_capital,
             capacity_existing, capacity_new_max)
 
-        push!(region_from.export_interfaces, interface)
-        push!(region_to.import_interfaces, interface)
+        push!(region_from.export_interfaces, iface_idx)
+        push!(region_to.import_interfaces, iface_idx)
         push!(interfaces, interface)
 
     end

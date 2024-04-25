@@ -102,8 +102,8 @@ struct Region <: AbstractRegion
     variabletechs::Vector{VariableTechnology}
     storagetechs::Vector{StorageTechnology}
 
-    export_interfaces::Vector{Interface}
-    import_interfaces::Vector{Interface}
+    export_interfaces::Vector{Int}
+    import_interfaces::Vector{Int}
 
 end
 
@@ -196,11 +196,13 @@ function Base.show(io::IO, ::MIME"text/plain", sys::System)
         neighbours = String[]
 
         for i in region.import_interfaces
-            push!(neighbours, i.region_from.name)
+            iface = sys.interfaces[i]
+            push!(neighbours, iface.region_from.name)
         end
 
         for i in region.export_interfaces
-            push!(neighbours, i.region_to.name)
+            iface = sys.interfaces[i]
+            push!(neighbours, iface.region_to.name)
         end
 
         println(io, region.name, "\t",
