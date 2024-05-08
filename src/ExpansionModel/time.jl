@@ -1,8 +1,13 @@
+# TODO: Revisit naming. Here we implicitly state that "days" and "TimePeriods"
+#       are synonymous
+# "period" sometimes implies a single timestep, sometimes a contiguous set of timesteps
 struct TimeProxyAssignment
     daylength::Int
     periods::Vector{TimePeriod} # set of all TimePeriods
     days::Vector{TimePeriod} # mapping from days to TimePeriods
 end
+
+periodcount(tpa::TimeProxyAssignment) = length(tpa.periods)
 
 function timestepcount(tpa::TimeProxyAssignment)
     tpa.daylength * length(tpa.days)

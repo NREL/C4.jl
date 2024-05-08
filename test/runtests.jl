@@ -8,6 +8,8 @@ sys = System("Data/toysystem")
 display(sys)
 
 fullchrono = fullchronology(sys, daylength=2)
+eue_estimator = nullestimator(sys, s -> fullchronology(s, daylength=2))
+max_eues = zeros(3)
 
 # for region in sys.regions
 #     for tech in region.variabletechs
@@ -27,6 +29,5 @@ fullchrono = fullchronology(sys, daylength=2)
 # display([ram.sys.generators.names ram.sys.generators.capacity])
 # display([ram.sys.storages.names, ram.sys.storages.charge_capacity])
 
-
-@time cem = ExpansionProblem(sys, fullchrono, fullchrono, HiGHS.Optimizer)
+@time cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, HiGHS.Optimizer)
 println(cem.model)

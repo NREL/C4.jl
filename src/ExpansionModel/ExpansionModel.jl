@@ -11,9 +11,10 @@ using ..Data
 include("jump_utils.jl")
 include("build.jl")
 include("time.jl")
+include("eue_estimator.jl")
 include("dispatch.jl")
 
-export fullchronology, ExpansionProblem
+export fullchronology, nullestimator, ExpansionProblem
 
 mutable struct ExpansionProblem
 
@@ -23,22 +24,27 @@ mutable struct ExpansionProblem
 
     builds::Builds
 
-    economicdispatch::DispatchSequence{EconomicDispatch}
-    reliabilitydispatch::DispatchSequence{ReliabilityDispatch}
+    economicdispatch::EconomicDispatchSequence
+    reliabilitydispatch::ReliabilityDispatchSequence
 
     function ExpansionProblem(
         system::System,
         economic_periods::TimeProxyAssignment,
-        reliability_periods::TimeProxyAssignment,
+        eue_estimator::EUEEstimator,
+        eue_max::Vector{Float64},
         optimizer)
 
         n_timesteps = length(system.timesteps)
+        n_regions = length(system.regions)
 
         timestepcount(economic_periods) == n_timesteps ||
             error("Economic period assignment is incompatible with system timesteps")
 
-        timestepcount(reliability_periods) == n_timesteps ||
+        timestepcount(eue_estimator.times) == n_timesteps ||
             error("Reliability period assignment is incompatible with system timesteps")
+
+        length(eue_max) == n_regions ||
+            error("Mismatch between EUE constraint count and system regions")
 
         m = JuMP.Model(optimizer)
 
@@ -46,11 +52,10 @@ mutable struct ExpansionProblem
             [RegionBuild(m, r) for r in system.regions],
             [InterfaceBuild(m, i) for i in system.interfaces])
 
-        economicdispatch = DispatchSequence{EconomicDispatch}(
-            m, builds, economic_periods)
+        economicdispatch = EconomicDispatchSequence(m, builds, economic_periods)
 
-        reliabilitydispatch = DispatchSequence{ReliabilityDispatch}(
-            m, builds, reliability_periods)
+        reliabilitydispatch = ReliabilityDispatchSequence(
+            m, builds, eue_estimator, eue_max)
 
         return new(m, system, builds, economicdispatch, reliabilitydispatch)
 
