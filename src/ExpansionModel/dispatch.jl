@@ -294,12 +294,37 @@ struct ReliabilityDispatch <: Dispatch
 
 end
 
+struct StorageSiteDispatchRecurrenceLinkage
+
+    emin_first::JuMP_LessThanConstraintRef
+    emin_last::JuMP_LessThanConstraintRef
+    emax_first::JuMP_LessThanConstraintRef
+    emax_last::JuMP_LessThanConstraintRef
+
+    function StorageSiteDispatchRecurrenceLinkage()
+        new()
+    end
+
+end
+
+struct StorageTechDispatchRecurrenceLinkage
+    sites::Vector{StorageSiteDispatchRecurrenceLinkage}
+end
+
+struct RegionDispatchRecurrenceLinkage
+    storagetechs::Vector{StorageTechDispatchRecurrenceLinkage}
+end
+
+struct DispatchRecurrenceLinkage
+    regions::Vector{RegionDispatchRecurrenceLinkage}
+end
+
 struct DispatchRecurrence{D <: Dispatch}
 
     dispatch::D
     repetitions::Int
 
-    # TODO: Add storage linking constraints here
+    linkage_to_prev::Union{Nothing,DispatchRecurrenceLinkage}
 
 end
 
@@ -314,7 +339,7 @@ struct EconomicDispatchSequence
 
         dispatches = [EconomicDispatch(m, builds, period) for period in time.periods]
 
-        recurrences = DispatchRecurrence{ReliabilityDispatch}[] # TODO
+        recurrences = sequence_recurrences(dispatches, time)
 
         new(time, dispatches, recurrences)
 
@@ -339,7 +364,7 @@ struct ReliabilityDispatchSequence
         dispatches = [ReliabilityDispatch(m, builds, period, period_estimator)
                       for (period, period_estimator) in allperiods(eue_estimator)]
 
-        recurrences = DispatchRecurrence{ReliabilityDispatch}[] # TODO
+        recurrences = sequence_recurrences(dispatches, eue_estimator.times)
 
         R = length(builds.regions)
 
@@ -352,5 +377,48 @@ struct ReliabilityDispatchSequence
         new(eue_estimator.times, dispatches, recurrences, region_eue, region_eue_max)
 
     end
+
+end
+
+function sequence_recurrences(
+    dispatches::Vector{D}, time::TimeProxyAssignment
+) where D <: Dispatch
+
+    # TODO: Generate linkages
+    recurrences = [
+        DispatchRecurrence(dispatches[p], repetitions, nothing) for
+        (p, repetitions) in deduplicate(time.days)
+    ]
+
+    return recurrences
+
+end
+
+function deduplicate(xs::Vector{Int})
+
+    result = Pair{Int,Int}[]
+
+    iszero(length(xs)) && return result
+
+    x_prev = first(xs)
+    repetitions = 1
+
+    for x in xs[2:end]
+
+        if x == x_prev
+            repetitions += 1
+            continue
+        end
+
+        push!(result, x_prev=>repetitions)
+
+        x_prev = x
+        repetitions = 1
+
+    end
+
+    push!(result, x_prev=>repetitions)
+
+    return result
 
 end

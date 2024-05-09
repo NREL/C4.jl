@@ -1,10 +1,11 @@
 # TODO: Revisit naming. Here we implicitly state that "days" and "TimePeriods"
 #       are synonymous
 # "period" sometimes implies a single timestep, sometimes a contiguous set of timesteps
+# TODO: Enforce valild period:days map and daylength
 struct TimeProxyAssignment
     daylength::Int
     periods::Vector{TimePeriod} # set of all TimePeriods
-    days::Vector{TimePeriod} # mapping from days to TimePeriods
+    days::Vector{Int} # mapping from days into TimePeriods set
 end
 
 periodcount(tpa::TimeProxyAssignment) = length(tpa.periods)
@@ -16,7 +17,7 @@ end
 function fullchronology(sys::System; daylength::Int=24)
     n_days = daycount(sys, daylength)
     periods = [TimePeriod(((d-1)*daylength+1):(d*daylength), "Day $d") for d in 1:n_days]
-    return TimeProxyAssignment(daylength, periods, periods)
+    return TimeProxyAssignment(daylength, periods, collect(1:n_days))
 end
 
 function add_period!(tpa::TimeProxyAssignment, tp::TimePeriod, ds::Vector{Int})

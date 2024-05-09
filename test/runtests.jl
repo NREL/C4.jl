@@ -1,8 +1,12 @@
+using Test
+
 using C4.Data
 using C4.AdequacyModel
 using C4.ExpansionModel
 
 import HiGHS
+
+include("ExpansionModel/sequencing.jl")
 
 sys = System("Data/toysystem")
 display(sys)
