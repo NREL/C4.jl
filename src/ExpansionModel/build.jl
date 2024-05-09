@@ -69,6 +69,12 @@ end
 
 sitebuildtype(::Type{StorageTechnology}) = StorageSiteBuild
 
+maxpower(build::StorageSiteBuild) =
+    build.params.power_existing + build.power_new
+
+maxenergy(build::StorageSiteBuild) =
+    build.params.energy_existing + build.energy_new
+
 struct TechnologyBuild{T<:ResourceTechnology,B<:ResourceSiteBuild}
 
     params::T

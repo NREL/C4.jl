@@ -1,9 +1,9 @@
-struct GeneratorDispatch
+struct GeneratorTechDispatch
 
     dispatch::Vector{JuMP.VariableRef}
     dispatch_max::Vector{JuMP_LessThanConstraintRef}
 
-    function GeneratorDispatch(
+    function GeneratorTechDispatch(
         m::JuMP.Model, regionbuild::RegionBuild, genbuild::GeneratorBuild, period::TimePeriod
     )
 
@@ -22,7 +22,7 @@ struct GeneratorDispatch
 
 end
 
-struct StorageDispatch
+struct StorageSiteDispatch
 
     dispatch::Vector{JuMP.VariableRef}
 
@@ -37,17 +37,20 @@ struct StorageDispatch
     e_low::JuMP.VariableRef # MWh
     e_low_def::Vector{JuMP_LessThanConstraintRef}
 
-    function StorageDispatch(
-        m::JuMP.Model, regionbuild::RegionBuild, storbuild::StorageBuild, period::TimePeriod
+    function StorageSiteDispatch(
+        m::JuMP.Model, regionbuild::RegionBuild, storbuild::StorageBuild,
+        sitebuild::StorageSiteBuild, period::TimePeriod
     )
 
         T = length(period)
 
         dispatch = @variable(m, [1:T])
-        fullname = join([regionbuild.params.name, storbuild.params.name, period.name], ",")
+        fullname = join([
+            regionbuild.params.name, storbuild.params.name,
+            sitebuild.params.name, period.name], ",")
         varnames!(dispatch, "stor_dispatch[$(fullname)]", 1:T)
 
-        capacity = maxpower(storbuild)
+        capacity = maxpower(sitebuild)
 
         dispatch_min = @constraint(m, [t in 1:T], -capacity <= dispatch[t])
         dispatch_max = @constraint(m, [t in 1:T], dispatch[t] <= capacity)
@@ -62,6 +65,30 @@ struct StorageDispatch
 
         return new(dispatch, dispatch_min, dispatch_max,
                    e_net, e_high, e_high_def, e_low, e_low_def)
+
+    end
+
+end
+
+struct StorageTechDispatch
+
+    sites::Vector{StorageSiteDispatch}
+    dispatch::Vector{JuMP_ExpressionRef}
+
+    function StorageTechDispatch(
+        m::JuMP.Model, regionbuild::RegionBuild, storbuild::StorageBuild, period::TimePeriod
+    )
+
+        T = length(period)
+
+        sites = [StorageSiteDispatch(m, regionbuild, storbuild, sitebuild, period)
+                 for sitebuild in storbuild.sites]
+
+        dispatch = @expression(m, [t in 1:T],
+           sum(site.dispatch[t] for site in sites)
+        )
+
+        new(sites, dispatch)
 
     end
 
@@ -97,9 +124,9 @@ end
 
 struct RegionEconomicDispatch
 
-    thermaltechs::Vector{GeneratorDispatch}
-    variabletechs::Vector{GeneratorDispatch}
-    storagetechs::Vector{StorageDispatch}
+    thermaltechs::Vector{GeneratorTechDispatch}
+    variabletechs::Vector{GeneratorTechDispatch}
+    storagetechs::Vector{StorageTechDispatch}
 
     netload::Vector{JuMP_ExpressionRef}
 
@@ -115,13 +142,13 @@ struct RegionEconomicDispatch
 
         T = length(period)
 
-        thermaldispatch = [GeneratorDispatch(m, regionbuild, techbuild, period)
+        thermaldispatch = [GeneratorTechDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.thermaltechs]
 
-        variabledispatch = [GeneratorDispatch(m, regionbuild, techbuild, period)
+        variabledispatch = [GeneratorTechDispatch(m, regionbuild, techbuild, period)
                             for techbuild in regionbuild.variabletechs]
 
-        storagedispatch = [StorageDispatch(m, regionbuild, techbuild, period)
+        storagedispatch = [StorageTechDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.storagetechs]
 
         netload = @expression(m, [t in 1:T], regionbuild.params.demand[t]
@@ -176,7 +203,7 @@ end
 
 struct RegionReliabilityDispatch
 
-    storagetechs::Vector{StorageDispatch}
+    storagetechs::Vector{StorageTechDispatch}
 
     surplus_mean::Vector{JuMP_ExpressionRef}
 
@@ -192,7 +219,7 @@ struct RegionReliabilityDispatch
 
         T = length(period)
 
-        storagedispatch = [StorageDispatch(m, regionbuild, techbuild, period)
+        storagedispatch = [StorageTechDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.storagetechs]
 
         surplus_mean = @expression(m, [t in 1:T],
