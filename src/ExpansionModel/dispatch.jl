@@ -1,3 +1,6 @@
+abstract type RegionDispatch end
+abstract type Dispatch end
+
 struct GeneratorTechDispatch
 
     dispatch::Vector{JuMP.VariableRef}
@@ -122,7 +125,7 @@ struct InterfaceDispatch
 
 end
 
-struct RegionEconomicDispatch
+struct RegionEconomicDispatch <: RegionDispatch
 
     thermaltechs::Vector{GeneratorTechDispatch}
     variabletechs::Vector{GeneratorTechDispatch}
@@ -166,8 +169,6 @@ struct RegionEconomicDispatch
 
 end
 
-abstract type Dispatch end
-
 struct EconomicDispatch <: Dispatch
 
     regions::Vector{RegionEconomicDispatch}
@@ -201,7 +202,7 @@ struct EconomicDispatch <: Dispatch
 
 end
 
-struct RegionReliabilityDispatch
+struct RegionReliabilityDispatch <: RegionDispatch
 
     storagetechs::Vector{StorageTechDispatch}
 
@@ -294,29 +295,89 @@ struct ReliabilityDispatch <: Dispatch
 
 end
 
-struct StorageSiteDispatchRecurrenceLinkage
+struct StorageSiteDispatchRecurrence
 
     emin_first::JuMP_LessThanConstraintRef
-    emin_last::JuMP_LessThanConstraintRef
     emax_first::JuMP_LessThanConstraintRef
+    emin_last::JuMP_LessThanConstraintRef
     emax_last::JuMP_LessThanConstraintRef
 
-    function StorageSiteDispatchRecurrenceLinkage()
-        new()
+    soc_last::JuMP_ExpressionRef
+
+    function StorageSiteDispatchRecurrence(
+        m::JuMP.Model,
+        prev_recurrence::Union{StorageSiteDispatchRecurrence,Nothing},
+        build::StorageSiteBuild, dispatch::StorageSiteDispatch, repetitions::Int)
+
+        energy = maxenergy(build)
+
+        soc0_first = isnothing(prev_recurrence) ? 0 : prev_recurrence.soc_last
+        soc0_last = soc0_first + (repetitions - 1) * dispatch.e_net
+
+        emin_first = @constraint(m, 0 <= soc0_first + dispatch.e_low)
+        emax_first = @constraint(m, soc0_first + dispatch.e_high <= energy)
+        emin_last = @constraint(m, 0 <= soc0_last + dispatch.e_low)
+        emax_last = @constraint(m, soc0_last + dispatch.e_high <= energy)
+
+        soc_last = soc0_first + repetitions * dispatch.e_net
+
+        new(emin_first, emax_first, emin_last, emax_last, soc_last)
+
     end
 
 end
 
-struct StorageTechDispatchRecurrenceLinkage
-    sites::Vector{StorageSiteDispatchRecurrenceLinkage}
+struct StorageTechDispatchRecurrence
+
+    sites::Vector{StorageSiteDispatchRecurrence}
+
+    function StorageTechDispatchRecurrence(
+        m::JuMP.Model,
+        prev_recurrence::Union{StorageTechDispatchRecurrence,Nothing},
+        build::TechnologyBuild{StorageTechnology,StorageSiteBuild},
+        dispatch::StorageTechDispatch, repetitions::Int
+    )
+
+        prev_recurrence_sites = isnothing(prev_recurrence) ?
+            StorageSiteDispatchRecurrence[] : prev_recurrence.sites
+
+        sites = [
+            StorageSiteDispatchRecurrence(
+                m, prev_siterecurrence, sitebuild, sitedispatch, repetitions)
+            for (prev_siterecurrence, sitebuild, sitedispatch)
+            in zip_longest(prev_recurrence_sites, build.sites, dispatch.sites)
+        ]
+
+        new(sites)
+
+    end
+
 end
 
-struct RegionDispatchRecurrenceLinkage
-    storagetechs::Vector{StorageTechDispatchRecurrenceLinkage}
-end
+struct RegionDispatchRecurrence
 
-struct DispatchRecurrenceLinkage
-    regions::Vector{RegionDispatchRecurrenceLinkage}
+    storagetechs::Vector{StorageTechDispatchRecurrence}
+
+    function RegionDispatchRecurrence(
+        m::JuMP.Model,
+        prev_recurrence::Union{RegionDispatchRecurrence,Nothing},
+        build::RegionBuild, dispatch::D, repetitions::Int
+    ) where D <: RegionDispatch
+
+        prev_recurrence_storagetechs = isnothing(prev_recurrence) ?
+            StorageTechDispatchRecurrence[] : prev_recurrence.storagetechs
+
+        storagetechs = [
+            StorageTechDispatchRecurrence(
+                m, prev_techrecurrence, techbuild, techdispatch, repetitions)
+            for (prev_techrecurrence, techbuild, techdispatch)
+            in zip_longest(prev_recurrence_storagetechs, build.storagetechs, dispatch.storagetechs)
+        ]
+
+        new(storagetechs)
+
+    end
+
 end
 
 struct DispatchRecurrence{D <: Dispatch}
@@ -324,7 +385,25 @@ struct DispatchRecurrence{D <: Dispatch}
     dispatch::D
     repetitions::Int
 
-    linkage_to_prev::Union{Nothing,DispatchRecurrenceLinkage}
+    regions::Vector{RegionDispatchRecurrence}
+
+    function DispatchRecurrence(
+        m::JuMP.Model, prev_recurrence::Union{DispatchRecurrence{D},Nothing},
+        build::Builds, dispatch::D, repetitions::Int
+    ) where D <: Dispatch
+
+        prev_recurrence_regions = isnothing(prev_recurrence) ?
+            RegionDispatchRecurrence[] : prev_recurrence.regions
+
+        regions = [
+            RegionDispatchRecurrence(
+                m, prev_regionrecurrence, regionbuild, regiondispatch, repetitions)
+            for (prev_regionrecurrence, regionbuild, regiondispatch)
+            in zip_longest(prev_recurrence_regions, build.regions, dispatch.regions)]
+
+        new{D}(dispatch, repetitions, regions)
+
+    end
 
 end
 
@@ -339,7 +418,7 @@ struct EconomicDispatchSequence
 
         dispatches = [EconomicDispatch(m, builds, period) for period in time.periods]
 
-        recurrences = sequence_recurrences(dispatches, time)
+        recurrences = sequence_recurrences(m, builds, dispatches, time)
 
         new(time, dispatches, recurrences)
 
@@ -364,7 +443,7 @@ struct ReliabilityDispatchSequence
         dispatches = [ReliabilityDispatch(m, builds, period, period_estimator)
                       for (period, period_estimator) in allperiods(eue_estimator)]
 
-        recurrences = sequence_recurrences(dispatches, eue_estimator.times)
+        recurrences = sequence_recurrences(m, builds, dispatches, eue_estimator.times)
 
         R = length(builds.regions)
 
@@ -381,14 +460,22 @@ struct ReliabilityDispatchSequence
 end
 
 function sequence_recurrences(
-    dispatches::Vector{D}, time::TimeProxyAssignment
+    m::JuMP.Model, builds::Builds, dispatches::Vector{D}, time::TimeProxyAssignment
 ) where D <: Dispatch
 
-    # TODO: Generate linkages
-    recurrences = [
-        DispatchRecurrence(dispatches[p], repetitions, nothing) for
-        (p, repetitions) in deduplicate(time.days)
-    ]
+    sequence = deduplicate(time.days)
+    recurrences = Vector{DispatchRecurrence}(undef, length(sequence))
+
+    prev_recurrence = nothing
+
+    for (i, (p, repetitions)) in enumerate(sequence)
+
+        recurrence = DispatchRecurrence(m, prev_recurrence, builds, dispatches[p], repetitions)
+
+        recurrences[i]  = recurrence
+        prev_recurrence = recurrence
+
+    end
 
     return recurrences
 

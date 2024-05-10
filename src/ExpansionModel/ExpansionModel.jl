@@ -6,6 +6,8 @@ import JuMP: @variable, @constraint, @expression
 import MathOptInterface
 const MOI = MathOptInterface
 
+import IterTools: zip_longest
+
 using ..Data
 
 include("jump_utils.jl")
