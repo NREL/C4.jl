@@ -97,24 +97,35 @@ end
 
 const ThermalBuild = TechnologyBuild{ThermalTechnology}
 const VariableBuild = TechnologyBuild{VariableTechnology}
-const GeneratorBuild = TechnologyBuild{<:Union{ThermalTechnology,VariableTechnology}}
+const GeneratorBuild = TechnologyBuild{<:GeneratorTechnology}
 const StorageBuild = TechnologyBuild{StorageTechnology}
 
 availablecapacity(build::ThermalBuild, t::Int) = sum(
         (site.params.units_existing + site.units_new) * build.params.unit_size
         * availability(site.params, t)
-        for site in build.sites)
+        for site in build.sites; init=0)
+
+cost(build::ThermalBuild) =
+    sum(site.units_new for site in build.sites; init=0) *
+    build.params.unit_size * build.params.cost_capital
 
 availablecapacity(build::VariableBuild, t::Int) = sum(
         (site.params.capacity_existing + site.capacity_new)
         * availability(site.params, t)
-        for site in build.sites)
+        for site in build.sites; init=0)
+
+cost(build::VariableBuild) =
+    sum(site.capacity_new for site in build.sites; init=0) * build.params.cost_capital
 
 maxpower(build::StorageBuild) = sum(
-    site.params.power_existing + site.power_new for site in build.sites)
+    site.params.power_existing + site.power_new for site in build.sites; init=0)
 
 maxenergy(build::StorageBuild) = sum(
-    site.params.energy_existing + site.energy_new for site in build.sites)
+    site.params.energy_existing + site.energy_new for site in build.sites; init=0)
+
+cost(build::StorageBuild) =
+    sum(site.power_new for site in build.sites; init=0) * build.params.cost_capital_power +
+    sum(site.energy_new for site in build.sites; init=0) * build.params.cost_capital_energy
 
 struct RegionBuild
 
@@ -141,6 +152,11 @@ struct RegionBuild
 
 end
 
+cost(build::RegionBuild) =
+    sum(cost(thermaltech) for thermaltech in build.thermaltechs; init=0) +
+    sum(cost(variabletech) for variabletech in build.variabletechs; init=0) +
+    sum(cost(storagetech) for storagetech in build.storagetechs; init=0)
+
 struct InterfaceBuild
 
     params::Interface
@@ -158,7 +174,13 @@ struct InterfaceBuild
 
 end
 
+cost(build::InterfaceBuild) = build.capacity_new * build.params.cost_capital
+
 struct Builds
      regions::Vector{RegionBuild}
      interfaces::Vector{InterfaceBuild}
 end
+
+cost(builds::Builds) =
+    sum(cost(region) for region in builds.regions; init=0) +
+    sum(cost(interface) for interface in builds.interfaces; init=0)

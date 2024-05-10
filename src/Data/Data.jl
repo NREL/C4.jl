@@ -6,7 +6,7 @@ import Base: length
 
 export availability, TimePeriod, Region, ResourceTechnology,
        ThermalTechnology, ThermalSite, VariableTechnology, VariableSite,
-       StorageTechnology, StorageSite, Interface, System
+       GeneratorTechnology, StorageTechnology, StorageSite, Interface, System
 
 include("time.jl")
 include("resources.jl")

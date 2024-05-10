@@ -110,6 +110,9 @@ struct DispatchRecurrence{D <: Dispatch}
 
 end
 
+cost(recurrence::DispatchRecurrence) =
+    cost(recurrence.dispatch) * recurrence.repetitions
+
 function sequence_recurrences(
     m::JuMP.Model, builds::Builds, dispatches::Vector{D}, time::TimeProxyAssignment
 ) where D <: Dispatch

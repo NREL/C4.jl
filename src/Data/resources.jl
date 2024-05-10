@@ -53,6 +53,8 @@ struct VariableTechnology <: ResourceTechnology
 
 end
 
+const GeneratorTechnology = Union{ThermalTechnology,VariableTechnology}
+
 struct StorageSite <: ResourceSite
 
     name::String

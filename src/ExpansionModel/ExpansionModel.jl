@@ -1,7 +1,7 @@
 module ExpansionModel
 
 import JuMP
-import JuMP: @variable, @constraint, @expression
+import JuMP: @variable, @constraint, @expression, @objective
 
 import MathOptInterface
 const MOI = MathOptInterface
@@ -62,6 +62,8 @@ mutable struct ExpansionProblem
 
         reliabilitydispatch = ReliabilityDispatchSequence(
             m, builds, eue_estimator, eue_max)
+
+        @objective(m, Min, cost(builds) + cost(economicdispatch))
 
         return new(m, system, builds, economicdispatch, reliabilitydispatch)
 

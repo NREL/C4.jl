@@ -48,19 +48,21 @@ struct ReliabilityDispatch <: Dispatch
     eue::Matrix{JuMP.VariableRef}
     eue_segments::JuMP.Containers.SparseAxisArray{JuMP_GreaterThanConstraintRef,3,Tuple{Int64,Int64,Int64}}
 
+    build::Builds
+
     function ReliabilityDispatch(
-        m::JuMP.Model, builds::Builds, period::TimePeriod,
+        m::JuMP.Model, build::Builds, period::TimePeriod,
         eue_estimator::PeriodEUEEstimator)
 
         T = length(period)
-        R = length(builds.regions)
-        regionnames = [region.params.name for region in builds.regions]
+        R = length(build.regions)
+        regionnames = [region.params.name for region in build.regions]
 
         interfaces = [InterfaceDispatch(m, iface, period)
-                   for iface in builds.interfaces]
+                   for iface in build.interfaces]
 
         regions = [RegionReliabilityDispatch(m, region, interfaces, period)
-                   for region in builds.regions]
+                   for region in build.regions]
 
         netimports = @expression(m, [r in 1:R, t in 1:T],
            sum(iface.flow[t] for iface in regions[r].import_interfaces) -
@@ -85,7 +87,7 @@ struct ReliabilityDispatch <: Dispatch
 
         new(regions, interfaces, netimports,
             surplus_mean, surplus_floor,
-            eue, eue_segments)
+            eue, eue_segments, build)
 
     end
 

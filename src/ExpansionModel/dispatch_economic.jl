@@ -9,6 +9,8 @@ struct RegionEconomicDispatch <: RegionDispatch
     import_interfaces::Vector{InterfaceDispatch}
     export_interfaces::Vector{InterfaceDispatch}
 
+    build::RegionBuild
+
     function RegionEconomicDispatch(
         m::JuMP.Model,
         regionbuild::RegionBuild,
@@ -36,11 +38,15 @@ struct RegionEconomicDispatch <: RegionDispatch
         export_interfaces = [interfaces[i] for i in regionbuild.params.export_interfaces]
 
         new(thermaldispatch, variabledispatch, storagedispatch,
-            netload, import_interfaces, export_interfaces)
+            netload, import_interfaces, export_interfaces, regionbuild)
 
     end
 
 end
+
+cost(dispatch::RegionEconomicDispatch) =
+    sum(cost(thermaltech) for thermaltech in dispatch.thermaltechs; init=0) +
+    sum(cost(variabletech) for variabletech in dispatch.variabletechs; init=0)
 
 struct EconomicDispatch <: Dispatch
 
@@ -50,16 +56,18 @@ struct EconomicDispatch <: Dispatch
     netimports::Matrix{JuMP_ExpressionRef}
     powerbalance::Matrix{JuMP_EqualToConstraintRef}
 
-    function EconomicDispatch(m::JuMP.Model, builds::Builds, period::TimePeriod)
+    build::Builds
+
+    function EconomicDispatch(m::JuMP.Model, build::Builds, period::TimePeriod)
 
         T = length(period)
-        R = length(builds.regions)
+        R = length(build.regions)
 
         interfaces = [InterfaceDispatch(m, iface, period)
-                   for iface in builds.interfaces]
+                   for iface in build.interfaces]
 
         regions = [RegionEconomicDispatch(m, region, interfaces, period)
-                   for region in builds.regions]
+                   for region in build.regions]
 
         netimports = @expression(m, [r in 1:R, t in 1:T],
            sum(iface.flow[t] for iface in regions[r].import_interfaces) -
@@ -69,12 +77,14 @@ struct EconomicDispatch <: Dispatch
         powerbalance = @constraint(m, [r in 1:R, t in 1:T],
             regions[r].netload[t] == netimports[r,t])
 
-        new(regions, interfaces, netimports, powerbalance)
+        new(regions, interfaces, netimports, powerbalance, build)
 
     end
 
 end
 
+cost(dispatch::EconomicDispatch) =
+    sum(cost(region) for region in dispatch.regions; init=0)
 
 struct EconomicDispatchSequence
 
@@ -94,3 +104,6 @@ struct EconomicDispatchSequence
     end
 
 end
+
+cost(sequence::EconomicDispatchSequence) =
+    sum(cost(recurrence) for recurrence in sequence.recurrences; init=0)

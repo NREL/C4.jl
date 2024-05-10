@@ -1,13 +1,16 @@
 # TODO: Differentiate reliability vs economic dispatch in variable names
 
-struct GeneratorTechDispatch
+struct GeneratorTechDispatch{G<:GeneratorTechnology}
 
     dispatch::Vector{JuMP.VariableRef}
     dispatch_max::Vector{JuMP_LessThanConstraintRef}
 
+    build::TechnologyBuild{G}
+
     function GeneratorTechDispatch(
-        m::JuMP.Model, regionbuild::RegionBuild, genbuild::GeneratorBuild, period::TimePeriod
-    )
+        m::JuMP.Model,
+        regionbuild::RegionBuild, genbuild::TechnologyBuild{G}, period::TimePeriod
+    ) where G <: GeneratorTechnology
 
         T = length(period)
 
@@ -18,11 +21,14 @@ struct GeneratorTechDispatch
         dispatch_max = @constraint(m, [t in 1:T],
             dispatch[t] <= availablecapacity(genbuild, t))
 
-        new(dispatch, dispatch_max)
+        new{G}(dispatch, dispatch_max, genbuild)
 
     end
 
 end
+
+cost(dispatch::GeneratorTechDispatch) =
+    sum(dispatch.dispatch) * dispatch.build.params.cost_generation
 
 struct StorageSiteDispatch
 
@@ -38,6 +44,8 @@ struct StorageSiteDispatch
 
     e_low::JuMP.VariableRef # MWh
     e_low_def::Vector{JuMP_LessThanConstraintRef}
+
+    build::StorageSiteBuild
 
     function StorageSiteDispatch(
         m::JuMP.Model, regionbuild::RegionBuild, storbuild::StorageBuild,
@@ -66,7 +74,7 @@ struct StorageSiteDispatch
         e_low_def = @constraint(m, [t in 1:T], e_low <= sum(dispatch[1:t]))
 
         return new(dispatch, dispatch_min, dispatch_max,
-                   e_net, e_high, e_high_def, e_low, e_low_def)
+                   e_net, e_high, e_high_def, e_low, e_low_def, sitebuild)
 
     end
 
@@ -76,6 +84,8 @@ struct StorageTechDispatch
 
     sites::Vector{StorageSiteDispatch}
     dispatch::Vector{JuMP_ExpressionRef}
+
+    build::StorageBuild
 
     function StorageTechDispatch(
         m::JuMP.Model, regionbuild::RegionBuild, storbuild::StorageBuild, period::TimePeriod
@@ -90,7 +100,7 @@ struct StorageTechDispatch
            sum(site.dispatch[t] for site in sites)
         )
 
-        new(sites, dispatch)
+        new(sites, dispatch, storbuild)
 
     end
 
@@ -102,6 +112,8 @@ struct InterfaceDispatch
 
     flow_min::Vector{JuMP_GreaterThanConstraintRef}
     flow_max::Vector{JuMP_LessThanConstraintRef}
+
+    build::InterfaceBuild
 
     function InterfaceDispatch(
         m::JuMP.Model, iface::InterfaceBuild, period::TimePeriod
@@ -118,7 +130,7 @@ struct InterfaceDispatch
         flow_max = @constraint(m, [t in 1:T],
             flow[t] <= iface.params.capacity_existing + iface.capacity_new)
 
-        new(flow, flow_min, flow_max)
+        new(flow, flow_min, flow_max, iface)
 
     end
 
