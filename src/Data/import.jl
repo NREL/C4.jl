@@ -151,11 +151,11 @@ function load_thermalsites!(system::System, datadir::String)
 
     end
 
-    lambdaspath = joinpath(datadir, "thermal/lambda.csv")
-    load_sites_timeseries!(system, ThermalTechnology, lambdaspath, :λ)
+    mttfpath = joinpath(datadir, "thermal/mttf.csv")
+    load_sites_timeseries!(system, ThermalTechnology, mttfpath, :λ, x -> 1/x)
 
-    muspath = joinpath(datadir, "thermal/mu.csv")
-    load_sites_timeseries!(system, ThermalTechnology, muspath, :μ)
+    mttrpath = joinpath(datadir, "thermal/mttr.csv")
+    load_sites_timeseries!(system, ThermalTechnology, mttrpath, :μ, x -> 1/x)
 
 end
 
@@ -286,7 +286,8 @@ function load_storagesites!(system::System, datadir::String)
 end
 
 function load_sites_timeseries!(
-    system::System, techtype::Type{<:ResourceTechnology}, datapath::String, field::Symbol
+    system::System, techtype::Type{<:ResourceTechnology}, datapath::String,
+    field::Symbol, transformer::Function=identity
 )
 
     validator = UpdateValidator(
@@ -312,7 +313,7 @@ function load_sites_timeseries!(
         site = get_site(
             system, techtype, regionname, techname, sitename)
 
-        getfield(site, field) .= Float64.(data[4:end, c])
+        getfield(site, field) .= transformer.(Float64.(data[4:end, c]))
 
     end
 
