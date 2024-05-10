@@ -75,11 +75,11 @@ function load_interfaces(datadir::String, regions::Vector{Region})
         capacity_existing = Float64(data[i,5])
         capacity_new_max = Float64(data[i,6])
 
-        region_from = getbyname(regions, region_from)
-        region_to = getbyname(regions, region_to)
+        from_idx, region_from = getbyname(regions, region_from)
+        to_idx, region_to = getbyname(regions, region_to)
 
         interface = Interface(
-            name, region_from, region_to, cost_capital,
+            name, from_idx, to_idx, cost_capital,
             capacity_existing, capacity_new_max)
 
         push!(region_from.export_interfaces, iface_idx)
@@ -113,7 +113,7 @@ function load_thermaltechs!(system::System, datadir::String)
         tech = ThermalTechnology(
             techname, cost_capital, cost_generation, size, ThermalSite[])
 
-        region = getbyname(system.regions, regionname)
+        _, region = getbyname(system.regions, regionname)
         push!(region.thermaltechs, tech)
 
     end
@@ -180,7 +180,7 @@ function load_variabletechs!(system::System, datadir::String)
         tech = VariableTechnology(
             techname, cost_capital, cost_generation, VariableSite[])
 
-        region = getbyname(system.regions, regionname)
+        _, region = getbyname(system.regions, regionname)
         push!(region.variabletechs, tech)
 
     end
@@ -244,7 +244,7 @@ function load_storagetechs!(system::System, datadir::String)
         tech = StorageTechnology(
             techname, cost_capital_power, cost_capital_energy, VariableSite[])
 
-        region = getbyname(system.regions, regionname)
+        _, region = getbyname(system.regions, regionname)
         push!(region.storagetechs, tech)
 
     end

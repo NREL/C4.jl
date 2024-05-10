@@ -21,6 +21,16 @@ end
 
 sitebuildtype(::Type{ThermalTechnology}) = ThermalSiteBuild
 
+function ThermalSite(build::ThermalSiteBuild)
+    site = build.params
+    new_units = value(build.units_new)
+    return ThermalSite(
+        site.name,
+        site.units_existing + new_units,
+        site.units_new_max - new_units,
+        site.λ, site.μ)
+end
+
 struct VariableSiteBuild <: ResourceSiteBuild
 
     params::VariableSite
@@ -41,6 +51,16 @@ struct VariableSiteBuild <: ResourceSiteBuild
 end
 
 sitebuildtype(::Type{VariableTechnology}) = VariableSiteBuild
+
+function VariableSite(build::VariableSiteBuild)
+    site = build.params
+    new_capacity = value(build.capacity_new)
+    return VariableSite(
+        site.name,
+        site.capacity_existing + new_capacity,
+        site.capacity_new_max - new_capacity,
+        site.availability)
+end
 
 struct StorageSiteBuild <: ResourceSiteBuild
 
@@ -74,6 +94,18 @@ maxpower(build::StorageSiteBuild) =
 
 maxenergy(build::StorageSiteBuild) =
     build.params.energy_existing + build.energy_new
+
+function StorageSite(build::StorageSiteBuild)
+    site = build.params
+    new_power = value(build.power_new)
+    new_energy = value(build.energy_new)
+    return StorageSite(
+        site.name,
+        site.power_existing + new_power,
+        site.power_new_max - new_power,
+        site.energy_existing + new_energy,
+        site.energy_new_max - new_energy)
+end
 
 struct TechnologyBuild{T<:ResourceTechnology,B<:ResourceSiteBuild}
 
@@ -109,6 +141,15 @@ cost(build::ThermalBuild) =
     sum(site.units_new for site in build.sites; init=0) *
     build.params.unit_size * build.params.cost_capital
 
+function ThermalTechnology(build::ThermalBuild)
+    thermaltech = build.params
+    return ThermalTechnology(
+        thermaltech.name,
+        thermaltech.cost_capital, thermaltech.cost_generation,
+        thermaltech.unit_size,
+        ThermalSite.(build.sites))
+end
+
 availablecapacity(build::VariableBuild, t::Int) = sum(
         (site.params.capacity_existing + site.capacity_new)
         * availability(site.params, t)
@@ -116,6 +157,14 @@ availablecapacity(build::VariableBuild, t::Int) = sum(
 
 cost(build::VariableBuild) =
     sum(site.capacity_new for site in build.sites; init=0) * build.params.cost_capital
+
+function VariableTechnology(build::VariableBuild)
+    variabletech = build.params
+    return VariableTechnology(
+        variabletech.name,
+        variabletech.cost_capital, variabletech.cost_generation,
+        VariableSite.(build.sites))
+end
 
 maxpower(build::StorageBuild) = sum(
     site.params.power_existing + site.power_new for site in build.sites; init=0)
@@ -126,6 +175,14 @@ maxenergy(build::StorageBuild) = sum(
 cost(build::StorageBuild) =
     sum(site.power_new for site in build.sites; init=0) * build.params.cost_capital_power +
     sum(site.energy_new for site in build.sites; init=0) * build.params.cost_capital_energy
+
+function StorageTechnology(build::StorageBuild)
+    storage = build.params
+    return StorageTechnology(
+        storage.name,
+        storage.cost_capital_power, storage.cost_capital_energy,
+        StorageSite.(build.sites))
+end
 
 struct RegionBuild
 
@@ -157,6 +214,16 @@ cost(build::RegionBuild) =
     sum(cost(variabletech) for variabletech in build.variabletechs; init=0) +
     sum(cost(storagetech) for storagetech in build.storagetechs; init=0)
 
+function Region(build::RegionBuild)
+    region = build.params
+    return Region(
+        region.name, region.demand,
+        ThermalTechnology.(build.thermaltechs),
+        VariableTechnology.(build.variabletechs),
+        StorageTechnology.(build.storagetechs),
+        region.export_interfaces, region.import_interfaces)
+end
+
 struct InterfaceBuild
 
     params::Interface
@@ -175,6 +242,15 @@ struct InterfaceBuild
 end
 
 cost(build::InterfaceBuild) = build.capacity_new * build.params.cost_capital
+
+function Interface(build::InterfaceBuild)
+    iface = build.params
+    new_capacity = value(build.capacity_new)
+    return Interface(
+        iface.name, iface.region_from, iface.region_to, iface.cost_capital,
+        iface.capacity_existing + new_capacity,
+        iface.capacity_new_max - new_capacity)
+end
 
 struct Builds
      regions::Vector{RegionBuild}

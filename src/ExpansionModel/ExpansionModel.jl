@@ -1,7 +1,7 @@
 module ExpansionModel
 
 import JuMP
-import JuMP: @variable, @constraint, @expression, @objective, optimize!
+import JuMP: @variable, @constraint, @expression, @objective, value
 
 import MathOptInterface
 const MOI = MathOptInterface
@@ -20,7 +20,7 @@ include("dispatch_recurrences.jl")
 include("dispatch_economic.jl")
 include("dispatch_reliability.jl")
 
-export fullchronology, nullestimator, ExpansionProblem, solve!
+export fullchronology, nullestimator, ExpansionProblem, solve!, cost, lcoe
 
 mutable struct ExpansionProblem
 
@@ -71,6 +71,18 @@ mutable struct ExpansionProblem
 
 end
 
-solve!(prob::ExpansionProblem) = optimize!(prob.model)
+solve!(prob::ExpansionProblem) = JuMP.optimize!(prob.model)
+
+cost(prob::ExpansionProblem) = JuMP.objective_value(prob.model)
+
+function lcoe(prob::ExpansionProblem)
+    total_demand = sum(sum(region.demand) for region in prob.system.regions)
+    return cost(prob) /  total_demand
+end
+
+System(prob::ExpansionProblem) = System(
+    prob.system.name, prob.system.timesteps,
+    Region.(prob.builds.regions), Interface.(prob.builds.interfaces)
+)
 
 end

@@ -247,15 +247,14 @@ function load_transmission(sys::System, meta)
 
     for (i, iface) in enumerate(sys.interfaces)
 
-        names[i] = iface.region_from.name * " -> " * iface.region_to.name
+        region_from = sys.regions[iface.region_from]
+        region_to = sys.regions[iface.region_to]
+        names[i] = region_from.name * " -> " * region_to.name
         capacity[i, :] .= round(Int, iface.capacity_existing)
-
-        from_idx = findfirst(isequal(iface.region_from), sys.regions)
-        to_idx = findfirst(isequal(iface.region_to), sys.regions)
 
         # Sort indices since PRAS requires from_idx < to_idx
         # Note: this would generally be dangerous, but no problem here since line limits are always symmetrical
-        from[i], to[i] = minmax(from_idx, to_idx)
+        from[i], to[i] = minmax(iface.region_from, iface.region_to)
 
         interface_line_idxs[i] = i:i
 

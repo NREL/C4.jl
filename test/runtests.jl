@@ -29,6 +29,7 @@ max_eues = zeros(3)
 
 @time ram = AdequacyProblem(sys)
 @time sf = assess(ram, samples=100)
+println(sf)
 
 # println(ram.sys.regions.names)
 
@@ -39,7 +40,16 @@ max_eues = zeros(3)
 
 @time cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, HiGHS.Optimizer)
 
-@time cem = ExpansionProblem(sys, repeatchrono, eue_estimator, max_eues, HiGHS.Optimizer)
+#@time cem = ExpansionProblem(sys, repeatchrono, eue_estimator, max_eues, HiGHS.Optimizer)
 # println(cem.model)
 
 @time solve!(cem)
+println("System Cost: ", cost(cem))
+println("System LCOE: ", lcoe(cem))
+
+sys_built = System(cem)
+display(sys_built)
+
+@time ram = AdequacyProblem(sys)
+@time sf = assess(ram, samples=100)
+println(sf)

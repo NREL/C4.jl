@@ -80,12 +80,12 @@ end
 
 abstract type AbstractRegion end
 
-struct Interface{R<:AbstractRegion}
+struct Interface
 
     name::String
 
-    region_from::R
-    region_to::R
+    region_from::Int
+    region_to::Int
 
     cost_capital::Float64 # $/MW
 
@@ -94,7 +94,7 @@ struct Interface{R<:AbstractRegion}
 
 end
 
-struct Region <: AbstractRegion
+struct Region
 
     name::String
 
@@ -120,12 +120,12 @@ struct System
     timesteps::StepRange{DateTime,Hour}
 
     regions::Vector{Region}
-    interfaces::Vector{Interface{Region}}
+    interfaces::Vector{Interface}
 
 end
 
 get_region(system::System, regionname::String) =
-    getbyname(system.regions, regionname)
+    last(getbyname(system.regions, regionname))
 
 regionset(system::System) = Set(r.name for r in system.regions)
 
@@ -136,8 +136,8 @@ function get_tech(
     techname::String
 )
 
-    region = getbyname(system.regions, regionname)
-    return getbyname(techs(region, techtype), techname)
+    _, region = getbyname(system.regions, regionname)
+    return last(getbyname(techs(region, techtype), techname))
 
 end
 
@@ -159,9 +159,9 @@ function get_site(
     sitename::String
 )
 
-    region = getbyname(system.regions, regionname)
-    tech = getbyname(techs(region, techtype), techname)
-    return getbyname(tech.sites, sitename)
+    _, region = getbyname(system.regions, regionname)
+    _, tech = getbyname(techs(region, techtype), techname)
+    return last(getbyname(tech.sites, sitename))
 
 end
 
@@ -178,9 +178,9 @@ function regiontechsiteset(system::System, techtype::Type{<:ResourceTechnology})
 end
 
 function getbyname(vals::Vector{T}, name::String) where T
-    val = findfirst(x -> x.name == name, vals)
-    isnothing(val) && error("Could not find entity with name $name")
-    return vals[val]
+    i = findfirst(x -> x.name == name, vals)
+    isnothing(i) && error("Could not find entity with name $name")
+    return i, vals[i]
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sys::System)
@@ -199,12 +199,12 @@ function Base.show(io::IO, ::MIME"text/plain", sys::System)
 
         for i in region.import_interfaces
             iface = sys.interfaces[i]
-            push!(neighbours, iface.region_from.name)
+            push!(neighbours, sys.regions[iface.region_from].name)
         end
 
         for i in region.export_interfaces
             iface = sys.interfaces[i]
-            push!(neighbours, iface.region_to.name)
+            push!(neighbours, sys.regions[iface.region_to].name)
         end
 
         println(io, region.name, "\t",
