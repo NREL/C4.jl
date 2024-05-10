@@ -14,7 +14,11 @@ include("jump_utils.jl")
 include("build.jl")
 include("time.jl")
 include("eue_estimator.jl")
+
 include("dispatch.jl")
+include("dispatch_recurrences.jl")
+include("dispatch_economic.jl")
+include("dispatch_reliability.jl")
 
 export fullchronology, nullestimator, ExpansionProblem
 
