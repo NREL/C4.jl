@@ -1,7 +1,7 @@
 module ExpansionModel
 
 import JuMP
-import JuMP: @variable, @constraint, @expression, @objective
+import JuMP: @variable, @constraint, @expression, @objective, optimize!
 
 import MathOptInterface
 const MOI = MathOptInterface
@@ -20,7 +20,7 @@ include("dispatch_recurrences.jl")
 include("dispatch_economic.jl")
 include("dispatch_reliability.jl")
 
-export fullchronology, nullestimator, ExpansionProblem
+export fullchronology, nullestimator, ExpansionProblem, solve!
 
 mutable struct ExpansionProblem
 
@@ -70,5 +70,7 @@ mutable struct ExpansionProblem
     end
 
 end
+
+solve!(prob::ExpansionProblem) = optimize!(prob.model)
 
 end

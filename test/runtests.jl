@@ -37,10 +37,9 @@ max_eues = zeros(3)
 # display([ram.sys.generators.names ram.sys.generators.capacity])
 # display([ram.sys.storages.names, ram.sys.storages.charge_capacity])
 
-println("Full Chronology")
 @time cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, HiGHS.Optimizer)
-println(cem.model)
 
-println("Repeated Day")
 @time cem = ExpansionProblem(sys, repeatchrono, eue_estimator, max_eues, HiGHS.Optimizer)
-println(cem.model)
+# println(cem.model)
+
+@time solve!(cem)
