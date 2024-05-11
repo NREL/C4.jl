@@ -28,6 +28,11 @@ struct ThermalTechnology <: ResourceTechnology
 
 end
 
+num_units(tech::ThermalTechnology) =
+    sum(site.units_existing for site in tech.sites; init=0)
+
+nameplatecapacity(tech::ThermalTechnology) =
+    num_units(tech) * tech.unit_size
 
 struct VariableSite <: ResourceSite
 
@@ -53,6 +58,9 @@ struct VariableTechnology <: ResourceTechnology
 
 end
 
+nameplatecapacity(tech::VariableTechnology) =
+    sum(site.capacity_existing for site in tech.sites; init=0)
+
 const GeneratorTechnology = Union{ThermalTechnology,VariableTechnology}
 
 struct StorageSite <: ResourceSite
@@ -77,6 +85,12 @@ struct StorageTechnology <: ResourceTechnology
     sites::Vector{StorageSite}
 
 end
+
+powerrating(tech::StorageTechnology) =
+    sum(site.power_existing for site in tech.sites; init=0)
+
+energyrating(tech::StorageTechnology) =
+    sum(site.energy_existing for site in tech.sites; init=0)
 
 abstract type AbstractRegion end
 
@@ -191,7 +205,9 @@ function Base.show(io::IO, ::MIME"text/plain", sys::System)
     println(io, "System with $r regions connected by $i interfaces")
     println(io, "spanning ", first(sys.timesteps), " to ", last(sys.timesteps))
 
-    println(io, "\nRegion\tThermal\tVRE\tStorage\tNeighbours")
+    length(sys.regions) > 0 && println(io, "\nSummary\n")
+
+    println(io, "Region\tThermal\tVRE\tStorage\tNeighbours")
 
     for region in sys.regions
 
@@ -215,41 +231,45 @@ function Base.show(io::IO, ::MIME"text/plain", sys::System)
 
     end
 
-    # for regionname in sort!(collect(keys(sys.regions)))
+    length(sys.regions) > 0 && println(io, "\nRegions\n")
 
-    #     region = sys.regions[regionname]
+    for region in sys.regions
 
-    #     has_gens = any(!iszero(gen.units_existing)
-    #                    for gen in values(region.generators))
+        has_thermal = any(tech -> nameplatecapacity(tech) > 0, region.thermaltechs)
+        has_variable = any(tech -> nameplatecapacity(tech) > 0, region.variabletechs)
+        has_storage = any(tech -> powerrating(tech) > 0, region.storagetechs)
 
-    #     has_stors = any(!iszero(stor.capacity_existing)
-    #                     for stor in values(region.storages))
+        println(io, region.name)
 
-    #     has_gens || has_stors || continue
+        has_thermal || has_variable || has_storage ||
+            println(io, "\t(No resources)")
 
-    #     println(io, "\n", regionname)
+        has_thermal && for thermaltech in region.thermaltechs
+            n_units = num_units(thermaltech)
+            iszero(n_units) && continue
+            println(io, "\t", thermaltech.name, ": ",
+                    n_units, " x ", thermaltech.unit_size, " MW")
+        end
 
-    #     for genname in sort!(collect(keys(region.generators)))
+        has_variable && for variabletech in region.variabletechs
+            capacity = nameplatecapacity(variabletech)
+            iszero(capacity) && continue
+            println(io, "\t", variabletech.name, ": ", capacity, " MW")
+        end
 
-    #         gen = region.generators[genname]
-    #         iszero(gen.units_existing) && continue
+        has_storage && for storagetech in region.storagetechs
+            power, energy = powerrating(storagetech), energyrating(storagetech)
+            iszero(power) && continue
+            println(io, "\t", storagetech.name, ": ",
+                    power, " MW (", energy / power, " h)")
+        end
 
-    #         println(io, "\t", genname, ": ",
-    #                 gen.units_existing * maximum(gen.maxgen), " MW")
+    end
 
-    #     end
+    length(sys.interfaces) > 0 && println(io, "\nInterfaces\n")
 
-    #     for storname in sort!(collect(keys(region.storages)))
-
-    #         stor = region.storages[storname]
-    #         iszero(stor.capacity_existing) && continue
-
-    #         println(io, "\t", storname, ": ",
-    #                 stor.capacity_existing, " MW (",
-    #                 stor.energy_existing / stor.capacity_existing, " h)")
-
-    #     end
-
-    # end
+    for interface in sys.interfaces
+        println(io, interface.name, ": ", interface.capacity_existing, " MW")
+    end
 
 end
