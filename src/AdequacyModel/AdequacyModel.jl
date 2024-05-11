@@ -61,7 +61,7 @@ function load_regions(sys::System, meta)
     load = zeros(Int, length(sys.regions), meta.N)
 
     for (r, region) in enumerate(sys.regions)
-        load[r, :] = region.demand
+        load[r, :] = round.(Int, region.demand)
     end
 
     return Regions{meta.N, meta.P}(names, load)
