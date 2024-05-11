@@ -63,7 +63,10 @@ mutable struct ExpansionProblem
         reliabilitydispatch = ReliabilityDispatchSequence(
             m, builds, eue_estimator, eue_max)
 
-        @objective(m, Min, cost(builds) + cost(economicdispatch))
+        # Capex is annualized, so scale opex to approximate an annual cost
+        opex_scalar = 8760 / n_timesteps
+
+        @objective(m, Min, cost(builds) + opex_scalar * cost(economicdispatch))
 
         return new(m, system, builds, economicdispatch, reliabilitydispatch)
 

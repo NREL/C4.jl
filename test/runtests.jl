@@ -28,8 +28,8 @@ max_eues = zeros(3)
 # end
 
 @time ram = AdequacyProblem(sys)
-@time sf = assess(ram, samples=100)
-println(sf)
+@time neues = assess_neue(ram, samples=1000)
+println("NEUE: ", neues)
 
 # println(ram.sys.regions.names)
 
@@ -50,6 +50,6 @@ println("System LCOE: ", lcoe(cem))
 sys_built = System(cem)
 display(sys_built)
 
-@time ram = AdequacyProblem(sys)
-@time sf = assess(ram, samples=100)
-println(sf)
+@time ram = AdequacyProblem(sys_built)
+@time neues = assess_neue(ram, samples=1000)
+println("NEUE: ", neues)

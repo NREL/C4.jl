@@ -8,7 +8,7 @@ import PRAS: assess
 
 using ..Data
 
-export AdequacyProblem, assess
+export AdequacyProblem, assess, assess_neue
 
 struct AdequacyProblem
     sys::SystemModel
@@ -40,6 +40,18 @@ function assess(prob::AdequacyProblem; samples::Int)
     sf, = assess(prob.sys, SequentialMonteCarlo(samples=samples, threaded=false), Shortfall())
 
     return vec(sum(sf.shortfall_mean, dims=1))
+
+end
+
+function assess_neue(prob::AdequacyProblem; samples::Int)
+
+    simspec = SequentialMonteCarlo(samples=samples, threaded=false)
+
+    sf, = assess(prob.sys, simspec, Shortfall())
+    region_eue = vec(sum(sf.shortfall_mean, dims=2))
+    region_demand = vec(sum(prob.sys.regions.load, dims=2))
+
+    return region_eue ./ region_demand .* 1_000_000
 
 end
 

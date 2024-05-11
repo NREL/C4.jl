@@ -239,7 +239,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::System)
         has_variable = any(tech -> nameplatecapacity(tech) > 0, region.variabletechs)
         has_storage = any(tech -> powerrating(tech) > 0, region.storagetechs)
 
-        println(io, region.name)
+        println(io, region.name, " (Peak Load: ", maximum(region.demand), " MW)")
 
         has_thermal || has_variable || has_storage ||
             println(io, "\t(No resources)")
