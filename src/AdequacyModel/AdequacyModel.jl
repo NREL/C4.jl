@@ -8,10 +8,16 @@ import PRAS: assess
 
 using ..Data
 
-export AdequacyProblem, assess, assess_neue
+export AdequacyProblem, AdequacyResult, assess
 
 struct AdequacyProblem
     sys::SystemModel
+end
+
+struct AdequacyResult
+    region_neue::Vector{Float64}
+    period_eue::Vector{Float64}
+    shortfall_samples::Array{Int,3}
 end
 
 function AdequacyProblem(sys::System)
@@ -37,21 +43,20 @@ end
 
 function assess(prob::AdequacyProblem; samples::Int)
 
-    sf, = assess(prob.sys, SequentialMonteCarlo(samples=samples, threaded=false), Shortfall())
-
-    return vec(sum(sf.shortfall_mean, dims=1))
-
-end
-
-function assess_neue(prob::AdequacyProblem; samples::Int)
-
     simspec = SequentialMonteCarlo(samples=samples, threaded=false)
 
-    sf, = assess(prob.sys, simspec, Shortfall())
-    region_eue = vec(sum(sf.shortfall_mean, dims=2))
-    region_demand = vec(sum(prob.sys.regions.load, dims=2))
+    sf, sfs, sps = assess(prob.sys, simspec,
+        Shortfall(), ShortfallSamples(), SurplusSamples())
 
-    return region_eue ./ region_demand .* 1_000_000
+    period_eue = vec(sum(sf.shortfall_mean, dims=1))
+    region_eue = vec(sum(sf.shortfall_mean, dims=2))
+
+    region_demand = vec(sum(prob.sys.regions.load, dims=2))
+    region_neue = region_eue ./ region_demand .* 1_000_000
+
+    shortfall = sfs.shortfall - sps.surplus
+
+    return AdequacyResult(region_neue, period_eue, shortfall)
 
 end
 

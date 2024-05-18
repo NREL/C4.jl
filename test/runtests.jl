@@ -3,10 +3,12 @@ using Test
 using C4.Data
 using C4.AdequacyModel
 using C4.ExpansionModel
+using C4.IterationModel
 
 import HiGHS
 
 include("ExpansionModel/sequencing.jl")
+include("IterationModel/eue_estimator.jl")
 
 sys = System("Data/toysystem")
 display(sys)
@@ -28,8 +30,8 @@ max_eues = zeros(3)
 # end
 
 @time ram = AdequacyProblem(sys)
-@time neues = assess_neue(ram, samples=1000)
-println("NEUE: ", neues)
+@time adequacy = assess(ram, samples=1000)
+println("NEUE: ", adequacy.region_neue)
 
 # println(ram.sys.regions.names)
 
@@ -51,5 +53,7 @@ sys_built = System(cem)
 display(sys_built)
 
 @time ram = AdequacyProblem(sys_built)
-@time neues = assess_neue(ram, samples=1000)
-println("NEUE: ", neues)
+@time adequacy = assess(ram, samples=1000)
+println("NEUE: ", adequacy.region_neue)
+
+aspp(sys, fullchrono, ones(3), HiGHS.Optimizer)

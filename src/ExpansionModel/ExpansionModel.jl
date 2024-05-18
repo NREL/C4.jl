@@ -20,7 +20,8 @@ include("dispatch_recurrences.jl")
 include("dispatch_economic.jl")
 include("dispatch_reliability.jl")
 
-export fullchronology, nullestimator, ExpansionProblem, solve!, cost, lcoe
+export fullchronology, nullestimator, ExpansionProblem, solve!, cost, lcoe,
+       TimeProxyAssignment
 
 mutable struct ExpansionProblem
 

@@ -23,7 +23,7 @@ sitebuildtype(::Type{ThermalTechnology}) = ThermalSiteBuild
 
 function ThermalSite(build::ThermalSiteBuild)
     site = build.params
-    new_units = value(build.units_new)
+    new_units = round(Int, value(build.units_new))
     return ThermalSite(
         site.name,
         site.units_existing + new_units,
@@ -132,6 +132,10 @@ const VariableBuild = TechnologyBuild{VariableTechnology}
 const GeneratorBuild = TechnologyBuild{<:GeneratorTechnology}
 const StorageBuild = TechnologyBuild{StorageTechnology}
 
+nameplatecapacity(build::ThermalBuild) = sum(
+        (site.params.units_existing + site.units_new) * build.params.unit_size
+        for site in build.sites; init=0)
+
 availablecapacity(build::ThermalBuild, t::Int) = sum(
         (site.params.units_existing + site.units_new) * build.params.unit_size
         * availability(site.params, t)
@@ -149,6 +153,10 @@ function ThermalTechnology(build::ThermalBuild)
         thermaltech.unit_size,
         ThermalSite.(build.sites))
 end
+
+nameplatecapacity(build::VariableBuild) = sum(
+        (site.params.capacity_existing + site.capacity_new)
+        for site in build.sites; init=0)
 
 availablecapacity(build::VariableBuild, t::Int) = sum(
         (site.params.capacity_existing + site.capacity_new)
