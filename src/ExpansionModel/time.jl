@@ -30,12 +30,6 @@ function timestepcount(tpa::TimeProxyAssignment)
     tpa.daylength * length(tpa.days)
 end
 
-function fullchronology(sys::System; daylength::Int=24)
-    n_days = daycount(sys, daylength)
-    periods = [TimePeriod(((d-1)*daylength+1):(d*daylength), "Day $d") for d in 1:n_days]
-    return TimeProxyAssignment(periods, collect(1:n_days))
-end
-
 function add_period!(tpa::TimeProxyAssignment, tp::TimePeriod, ds::Vector{Int})
     push!(tpa.periods, tp)
     days[ds] .= tp
@@ -49,3 +43,6 @@ function daycount(sys::System, daylength::Int)
         error("System timesteps ($(n_periods)) should be a multiple of daylength ($(daylength))")
     return n_days
 end
+
+hours_from_day(d::Int, daylength::Int=24) =
+    ((d-1)*daylength+1):(d*daylength)

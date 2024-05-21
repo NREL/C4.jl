@@ -13,6 +13,7 @@ using ..Data
 include("jump_utils.jl")
 include("build.jl")
 include("time.jl")
+include("representative_periods.jl")
 include("eue_estimator.jl")
 
 include("dispatch.jl")
@@ -20,8 +21,9 @@ include("dispatch_recurrences.jl")
 include("dispatch_economic.jl")
 include("dispatch_reliability.jl")
 
-export fullchronology, nullestimator, ExpansionProblem, solve!, cost, lcoe,
-       TimeProxyAssignment
+export nullestimator, ExpansionProblem, solve!, cost, lcoe,
+       TimeProxyAssignment, singleperiod, seasonalperiods, montlyperiods,
+       weeklyperiods, dailyperiods, fullchronologyperiods
 
 mutable struct ExpansionProblem
 
