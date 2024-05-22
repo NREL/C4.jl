@@ -22,7 +22,7 @@ include("dispatch_economic.jl")
 include("dispatch_reliability.jl")
 
 export nullestimator, ExpansionProblem, solve!, cost, lcoe,
-       TimeProxyAssignment, singleperiod, seasonalperiods, montlyperiods,
+       TimeProxyAssignment, singleperiod, seasonalperiods, monthlyperiods,
        weeklyperiods, dailyperiods, fullchronologyperiods
 
 mutable struct ExpansionProblem
@@ -67,7 +67,7 @@ mutable struct ExpansionProblem
             m, builds, eue_estimator, eue_max)
 
         # Capex is annualized, so scale opex to approximate an annual cost
-        opex_scalar = 8760 / n_timesteps
+        opex_scalar = 8766 / n_timesteps
 
         @objective(m, Min, cost(builds) + opex_scalar * cost(economicdispatch))
 
@@ -82,8 +82,14 @@ solve!(prob::ExpansionProblem) = JuMP.optimize!(prob.model)
 cost(prob::ExpansionProblem) = JuMP.objective_value(prob.model)
 
 function lcoe(prob::ExpansionProblem)
+
+    # TODO: Need to apply the relevant weightings for this to be accurate!
     total_demand = sum(sum(region.demand) for region in prob.system.regions)
-    return cost(prob) /  total_demand
+
+    # Scale demand to an approximate annual value to compare to annualized costs
+    demand_scaler = 8766 / length(prob.system.timesteps)
+
+    return cost(prob) /  (demand_scaler * total_demand)
 end
 
 System(prob::ExpansionProblem) = System(

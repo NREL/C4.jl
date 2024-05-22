@@ -24,7 +24,6 @@ function medoid_timegrouping(sys::System, grouper::Function, daylength::Int=24)
 
     for (group_idx, group) in enumerate(groups)
 
-        println(group, "\n")
         group_days = [d for (d, daygroup) in enumerate(day_groups) if daygroup == group]
         group_features = Matrix{Float64}(undef, n_features, length(group_days))
 
@@ -32,11 +31,9 @@ function medoid_timegrouping(sys::System, grouper::Function, daylength::Int=24)
             days[day_idx] = group_idx
             timerange = hours_from_day(day_idx, daylength)
             labels, features = extract_features(sys, n_features, timerange)
-            println(labels)
             group_features[:, i] = features
         end
 
-        display(group_features)
         whiten!(group_features)
 
         medoid_day_idx = group_days[find_medoid(group_features)]

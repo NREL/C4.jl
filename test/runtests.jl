@@ -24,7 +24,6 @@ max_eues = zeros(3)
 println("NEUE: ", adequacy.region_neue)
 
 @time cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, HiGHS.Optimizer)
-
 @time cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, HiGHS.Optimizer)
 
 @time solve!(cem)
@@ -38,4 +37,8 @@ display(sys_built)
 @time adequacy = assess(ram, samples=1000)
 println("NEUE: ", adequacy.region_neue)
 
-aspp(sys, fullchrono, ones(3), HiGHS.Optimizer)
+max_eues = ones(3)
+@time cem, adequacy = aspp(sys, fullchrono, max_eues, HiGHS.Optimizer)
+println("System Cost: ", cost(cem))
+println("System LCOE: ", lcoe(cem))
+println("NEUE: ", adequacy.region_neue)

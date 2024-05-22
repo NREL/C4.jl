@@ -21,7 +21,12 @@ function aspp(
     println(adequacy.region_neue)
     eue_estimator = nullestimator(sys, s -> economic_chronology)
 
+    cem = nothing
+    n_iters = 0
+
     while any(neue > max_neue for (neue, max_neue) in zip(adequacy.region_neue, max_neues))
+
+        n_iters += 1
 
         @time cem = ExpansionProblem(sys, economic_chronology, eue_estimator, max_eues, optimizer)
         @time solve!(cem)
@@ -34,6 +39,8 @@ function aspp(
         eue_estimator = update_estimator(sys, cem, adequacy, eue_estimator)
 
     end
+
+    return cem, adequacy, n_iters
 
 end
 

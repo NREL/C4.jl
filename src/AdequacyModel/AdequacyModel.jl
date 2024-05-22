@@ -43,7 +43,7 @@ end
 
 function assess(prob::AdequacyProblem; samples::Int)
 
-    simspec = SequentialMonteCarlo(samples=samples, threaded=false)
+    simspec = SequentialMonteCarlo(samples=samples)
 
     sf, sfs, sps = assess(prob.sys, simspec,
         Shortfall(), ShortfallSamples(), SurplusSamples())
