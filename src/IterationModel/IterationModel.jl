@@ -8,6 +8,8 @@ import JuMP: value
 
 export aspp
 
+include("eue_estimator_compression.jl")
+
 function aspp(
     sys::System, economic_chronology::ExpansionModel.TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer; nsamples::Int=1000)
@@ -151,7 +153,10 @@ function estimator_params(steps::Vector{Int}, n_samples::Int)
         surpl_prev = surpl
     end
 
-    return eue_int, lolps
+    @assert iszero(first(lolps))
+    @assert iszero(first(eue_int))
+
+    return eue_int[2:end], lolps[2:end]
 
 end
 
