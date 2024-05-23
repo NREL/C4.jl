@@ -1,51 +1,74 @@
-function estimator_compression(ints::Vector{Float64}, slopes::Vector{Float64}, max_error::Float64)
-    return reduced_ints, reduced_slopes
-end
+# TODO: None of this code is optimized, revisit if needed
 
-function removal_candidates(ints::Vector{Float64}, slopes::Vector{Float64})
+function compress_estimator(
+    ints::Vector{Float64}, slopes::Vector{Float64}, errorlimit::Float64=Inf)
 
     n_segments = length(ints)
-
-    length(slopes) == n_segments || error("Number of slopes and intercepts must match")
-
-    # We need at least two segments to consider removing any
-    n_segments > 1 || return Pair{Int,Float64}[]
-
     included = BitSet(1:n_segments)
-    maxerrors = new_maxerror.(Ref(ints), Ref(slopes), Ref(included), 1:n_segments)
 
     candidates = Pair{Float64,Int}[]
-    already_removed = BitSet()
+    maxerrors = Float64[]
+    removal_order = Int[]
 
-    # Potential performance improvement: for a tranche of equal-maxerror segments,
-    # remove the largest non-sequential subset instead of stopping at the first
-    # adjacent segment found. Logic might be overly complicated though.
-    # Current approach becomes one-at-a-time removal/recalculation in worst case,
-    # which still works (but is slower than necessary)
+    # TODO: There's a lot of repeated work here, we should cache max_errs &
+    # invalidate when neighbors are removed
 
-    for i in sortperm(maxerrors)
+    while length(included) > 1
 
-        prev_removed = i-1 in already_removed
-        next_removed = i+1 in already_removed
+        for segment_idx in included
+            max_err = new_maxerror(ints, slopes, included, segment_idx)
+            push!(candidates, max_err => segment_idx)
+        end
 
-        (prev_removed || next_removed) && break
+        max_err, idx = minimum(candidates)
+        empty!(candidates)
 
-        push!(candidates, maxerrors[i]=>i)
-        push!(already_removed, i)
+        max_err > errorlimit && break
+
+        delete!(included, idx)
+        push!(removal_order, idx)
+        push!(maxerrors, max_err)
 
     end
 
-    return candidates
+    keep = collect(included)
+    sort!(keep)
+
+    return ints[keep], slopes[keep], removal_order, maxerrors
 
 end
 
+function compress_estimators(
+    ints::Vector{Vector{Float64}}, slopes::Vector{Vector{Float64}},
+    errorlimit::Float64=Inf)
 
+    n_curves = length(ints)
+
+    length(slopes) == n_curves ||
+        error("Number of curves must match between slopes and intercepts")
+
+    result = Tuple{Float64,Int,Int}[]
+
+    for i in 1:n_curves
+        _, _, removal_order, maxerrors = compress_estimator(ints[i], slopes[i])
+        append!(result, tuple.(maxerrors, i, removal_order))
+    end
+
+    sort!(result)
+
+    # TODO: Map back to individual curves that respect the joint error limit
+
+    return result
+
+end
+
+"""
+Calculate error between "true" value and compressed curve at
+intersection of nearest non-removed segments on each side of candidate
+"""
 function new_maxerror(
     ints::Vector{Float64}, slopes::Vector{Float64},
     included::BitSet, candidate_segment::Int)
-
-    # Calculate error between "true" value and compressed curve at
-    # intersection of nearest non-removed segments on each side of candidate
 
     n_segments = length(ints)
 
@@ -61,23 +84,20 @@ function new_maxerror(
     candidate_segment in included ||
         error("The removal candidate must not already be removed")
 
-    if candidate_segment == 1
+    next_segment = next_idx(included, candidate_segment, n_segments)
+    prev_segment = prev_idx(included, candidate_segment)
 
-        next_segment = next_idx(included, candidate_segment, n_segments)
+    if isnothing(prev_segment)
+
         max_error_x = ints[next_segment] / slopes[next_segment]
 
         return ints[candidate_segment] - slopes[candidate_segment] * max_error_x
 
-    elseif candidate_segment == n_segments
-
-        prev_segment = prev_idx(included, candidate_segment)
+    elseif isnothing(next_segment)
 
         return ints[candidate_segment] - ints[prev_segment]
 
     else
-
-        next_segment = next_idx(included, candidate_segment, n_segments)
-        prev_segment = prev_idx(included, candidate_segment)
 
         int_prev, int, int_next =
             ints[[prev_segment, candidate_segment, next_segment]]
@@ -95,11 +115,25 @@ function new_maxerror(
 
 end
 
+function total_error_curve(steps::Vector{Tuple{Float64,Int,Int}}, n_curves::Int)
+
+    max_err = zeros(n_curves)
+    total_err = similar(steps, Float64)
+
+    for (i, (err, curve_idx, segment_idx)) in enumerate(steps)
+        max_err[curve_idx] = err
+        total_err[i] = sum(max_err)
+    end
+
+    return total_err
+
+end
+
 function prev_idx(included::BitSet, i0::Int)
     i = i0 - 1
     while i ∉ included
         i -= 1
-        i < 1 && error("No indices lower that $(i0)")
+        i < 1 && return nothing
     end
     return i
 end
@@ -108,7 +142,7 @@ function next_idx(included::BitSet, i0::Int, imax::Int)
     i = i0 + 1
     while i ∉ included
         i += 1
-        i > imax && error("No indices higher than $(i0)")
+        i > imax && return nothing
     end
     return i
 end

@@ -1,4 +1,6 @@
-using C4.IterationModel: estimator_params, removal_candidates
+using C4.IterationModel:
+    estimator_params, new_maxerror,
+    compress_estimator, compress_estimators, total_error_curve
 
 @testset "EUE estimator" begin
 
@@ -23,21 +25,47 @@ using C4.IterationModel: estimator_params, removal_candidates
 
     @testset "EUE estimator compression" begin
 
-        # This is a bad test case since equally-spaced / equal-slope-changed
-        # segments all have the same max error (0.5), with degenerate sort
-        # results (except for the last segment, when the "next" segment is
-        # the x axis i.e. infinite slope)
-        eue_slopes = [0.2, 0.4, 0.6, 0.8, 1.0]
-        eue_ints = [5., 9, 12, 14, 15]
-        candidates = removal_candidates(eue_ints, eue_slopes)
-        @test all(isapprox(0.5), first.(candidates))
+        eue_slopes1 = [0.2, 0.4, 0.6, 0.8, 1.0]
+        eue_ints1 = [5., 9, 12, 14, 15]
 
-        eue_slopes = [0.2, 1.0]
-        eue_ints = [3, 13.4]
-        candidates = removal_candidates(eue_ints, eue_slopes)
-        @test length(candidates) == 1
-        @test first(first(candidates)) ≈ 0.32
-        @test last(first(candidates)) == 1
+        _, _, order, curve = compress_estimator(eue_ints1, eue_slopes1)
+        println(order)
+        println(curve)
+
+        segments = BitSet(1:5)
+        @test new_maxerror(eue_ints1, eue_slopes1, segments, 1) ≈ 0.5
+        @test new_maxerror(eue_ints1, eue_slopes1, segments, 2) ≈ 0.5
+        @test new_maxerror(eue_ints1, eue_slopes1, segments, 3) ≈ 0.5
+        @test new_maxerror(eue_ints1, eue_slopes1, segments, 4) ≈ 0.5
+        @test new_maxerror(eue_ints1, eue_slopes1, segments, 5) ≈ 1.0
+
+        eue_slopes2 = [0.2, 1.0]
+        eue_ints2 = [3, 13.4]
+
+        _, _, order, curve = compress_estimator(eue_ints2, eue_slopes2)
+        println(order)
+        println(curve)
+
+        segments = BitSet(1:2)
+        @test new_maxerror(eue_ints2, eue_slopes2, segments, 1) ≈ 0.32
+        @test new_maxerror(eue_ints2, eue_slopes2, segments, 2) ≈ 10.4
+
+        combined_curve = compress_estimators(
+            [eue_ints1, eue_ints2], [eue_slopes1, eue_slopes2])
+
+        @test length(combined_curve) == 5
+
+        @test combined_curve[1][1] ≈ 0.32
+        @test combined_curve[1][2] == 2
+        @test combined_curve[1][3] == 1
+
+        @test combined_curve[2][1] ≈ 0.5
+        @test combined_curve[2][2] == 1
+
+        @test combined_curve[3][1] ≈ 0.5
+        @test combined_curve[3][2] == 1
+
+        total_error_curve(combined_curve, 2) ≈ [0.32, 0.82, 0.82, 1.32, 3.32]
 
     end
 
