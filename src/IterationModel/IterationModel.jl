@@ -12,10 +12,25 @@ include("eue_estimator_compression.jl")
 
 function aspp(
     sys::System, economic_chronology::ExpansionModel.TimeProxyAssignment,
-    max_neues::Vector{Float64}, optimizer; nsamples::Int=1000)
+    max_neues::Vector{Float64}, optimizer;
+    nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[])
 
-    max_eues = [max_neue / 1_000_000 * sum(region.demand)
-                for (max_neue, region) in zip(max_neues, sys.regions)]
+    neue_factors = [sum(region.demand) * 1e-6 for region in sys.regions]
+    max_eues = max_neues .* neue_factors
+
+    if length(neue_tols) > 0
+
+        all(neue_tols .< max_neues) ||
+            error("NEUE compression error tolerances must be less than the provided NEUE thresholds")
+        eue_tols = neue_tols .* neue_factors
+
+        # We assume the worst and require that NEUE estimate + error <= threshold
+        max_eues .-= eue_tols
+
+    else
+        eue_tols = zeros(length(sys.regions))
+    end
+
 
     display(sys)
     @time ram = AdequacyProblem(sys)
@@ -38,7 +53,7 @@ function aspp(
         @time ram = AdequacyProblem(sys)
         @time adequacy = assess(ram, samples=nsamples)
         println(adequacy.region_neue, "\n")
-        eue_estimator = update_estimator(sys, cem, adequacy, eue_estimator)
+        eue_estimator = update_estimator(sys, cem, adequacy, eue_estimator, eue_tols)
 
     end
 
@@ -48,14 +63,17 @@ end
 
 function update_estimator(
     sys::System, cem::ExpansionProblem, adequacy::AdequacyResult,
-    old_estimator::ExpansionModel.EUEEstimator
+    old_estimator::ExpansionModel.EUEEstimator, eue_tols::Vector{Float64}
 )
 
     times = add_stressperiod(old_estimator.times, adequacy)
 
     new_estimators = estimators(cem, adequacy, times)
+    new_estimator = ExpansionModel.EUEEstimator(times, new_estimators)
 
-    return ExpansionModel.EUEEstimator(times, new_estimators)
+    length(eue_tols) > 0 && compress_estimator!(new_estimator, eue_tols)
+
+    return new_estimator
 
 end
 
@@ -110,53 +128,58 @@ function period_estimator(
     return ExpansionModel.PeriodEUEEstimator(eue_ints, eue_slopes)
 
 end
-
 function estimator_params(steps::Vector{Int}, n_samples::Int)
 
-    sort!(steps)
+    n_steps = length(steps)
 
-    lolps = Float64[]
-    surpluses = Int[]
+    intercepts = Float64[]
+    slopes = Float64[]
 
-    step = length(steps)
-    surplus = last(steps)
-    n_greater = 0
+    cum_count = 0
+    cum_eue = 0.
+    prev_surplus = Inf
+    prev_slope = 0
 
-    push!(surpluses, surplus)
-    push!(lolps, n_greater / n_samples) # Always 0
+    for (surplus, count) in unique_steps(steps)
 
-    while surplus > 0 && step > 1
+        cum_count += count
+        slope = cum_count / n_samples
 
-        step -= 1
-        n_greater += 1
-        new_surplus = steps[step]
-        new_surplus == surplus && continue
+        if !isinf(prev_surplus)
+            cum_eue += prev_slope * (prev_surplus - surplus)
+        end
 
-        surplus = new_surplus
+        push!(slopes, slope)
+        push!(intercepts, cum_eue + slope * surplus)
 
-        push!(surpluses, surplus)
-        push!(lolps, n_greater / n_samples)
+        prev_surplus = surplus
+        prev_slope = slope
 
     end
 
-    push!(surpluses, 0)
-    push!(lolps, (n_greater + 1) / n_samples)
+    return intercepts, slopes
 
-    n_segments = length(lolps)
-    eue_int = similar(lolps)
-    eue_prev = 0
-    surpl_prev = 0
+end
 
-    for (i, (surpl, lolp)) in enumerate(zip(surpluses, lolps))
-        eue_int[i] = surpl_prev * lolp + eue_prev
-        eue_prev += (surpl_prev - surpl)  * lolp
-        surpl_prev = surpl
+function unique_steps(steps::Vector{Int})
+
+    d = Dict{Int,Int}()
+    result = Pair{Int,Int}[]
+
+    for s in steps
+        s <= 0 && continue
+        if s in keys(d)
+            d[s] += 1
+        else
+            d[s] = 1
+        end
     end
 
-    @assert iszero(first(lolps))
-    @assert iszero(first(eue_int))
+    for s in sort(collect(keys(d)), rev=true)
+        push!(result, s => d[s])
+    end
 
-    return eue_int[2:end], lolps[2:end]
+    return result
 
 end
 

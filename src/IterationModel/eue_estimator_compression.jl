@@ -1,5 +1,60 @@
 # TODO: None of this code is optimized, revisit if needed
 
+function compress_estimator!(estimator::ExpansionModel.EUEEstimator, eue_tols::Vector{Float64})
+
+    n_regions = size(first(estimator.estimators).slopes, 1)
+    length(eue_tols) == n_regions ||
+        error("Number of EUE tolerances passed does not match number of regions")
+
+    for (r, tol) in enumerate(eue_tols)
+        compress_estimator!(estimator, r, tol)
+    end
+
+end
+
+function compress_estimator!(estimator::ExpansionModel.EUEEstimator, r::Int, eue_tol::Float64)
+
+    n_periods = length(estimator.estimators)
+    t_per_period = estimator.times.daylength
+
+    slopes = Matrix{Vector{Float64}}(undef, t_per_period, n_periods)
+    intercepts = Matrix{Vector{Float64}}(undef, t_per_period, n_periods)
+
+    for (p, period_estimator) in enumerate(estimator.estimators)
+        slopes[:, p] = period_estimator.slopes[r,:]
+        intercepts[:, p] = period_estimator.intercepts[r,:]
+    end
+
+    n_curves = length(slopes)
+    n_segments = sum(length.(slopes))
+
+
+    # Note: No need to compute the entire curves here, could stop once tol is reached
+
+    combined_curve = compress_estimators(intercepts, slopes)
+    eue_errors = total_error_curve(combined_curve, n_curves)
+
+    keepers = [BitSet(eachindex(slopes[t,p])) for t in 1:t_per_period, p in 1:n_periods]
+
+    for (err, s, t, p) in combined_curve
+        err > eue_tol && break
+        delete!(keepers[t,p], s)
+    end
+
+    for p in 1:n_periods, t in 1:t_per_period
+
+        curve_keepers = collect(keepers[t,p])
+
+        all_slopes = estimator.estimators[p].slopes[r,t]
+        estimator.estimators[p].slopes[r,t] = all_slopes[curve_keepers]
+
+        all_ints = estimator.estimators[p].intercepts[r,t]
+        estimator.estimators[p].intercepts[r,t] = all_ints[curve_keepers]
+
+    end
+
+end
+
 function compress_estimator(
     ints::Vector{Float64}, slopes::Vector{Float64}, errorlimit::Float64=Inf)
 
@@ -39,28 +94,31 @@ function compress_estimator(
 end
 
 function compress_estimators(
-    ints::Vector{Vector{Float64}}, slopes::Vector{Vector{Float64}},
+    ints::Matrix{Vector{Float64}}, slopes::Matrix{Vector{Float64}},
     errorlimit::Float64=Inf)
 
-    n_curves = length(ints)
+    daylength, n_periods = size(ints)
 
-    length(slopes) == n_curves ||
+    size(slopes) == size(ints) ||
         error("Number of curves must match between slopes and intercepts")
 
-    result = Tuple{Float64,Int,Int}[]
+    result = Tuple{Float64,Int,Int,Int}[]
 
-    for i in 1:n_curves
-        _, _, removal_order, maxerrors = compress_estimator(ints[i], slopes[i])
-        append!(result, tuple.(maxerrors, i, removal_order))
+    for p in 1:n_periods, t in 1:daylength
+        _, _, segment_idxs, maxerrors = compress_estimator(ints[t,p], slopes[t,p])
+        append!(result, tuple.(maxerrors, segment_idxs, t, p))
     end
 
     sort!(result)
 
-    # TODO: Map back to individual curves that respect the joint error limit
-
     return result
 
 end
+
+compress_estimators(
+    ints::Vector{Vector{Float64}}, slopes::Vector{Vector{Float64}},
+    errorlimit::Float64=Inf) =
+    compress_estimators(reshape(ints, :, 1), reshape(slopes, :, 1), errorlimit)
 
 """
 Calculate error between "true" value and compressed curve at
@@ -115,13 +173,21 @@ function new_maxerror(
 
 end
 
-function total_error_curve(steps::Vector{Tuple{Float64,Int,Int}}, n_curves::Int)
+function total_error_curve(steps::Vector{Tuple{Float64,Int,Int,Int}}, n_curves::Int)
 
-    max_err = zeros(n_curves)
+    n_timesteps = 0
+    n_periods = 0
+
+    for (_, _, curve_timestep_idx, curve_period_idx) in steps
+        n_periods = max(n_periods, curve_period_idx)
+        n_timesteps = max(n_timesteps, curve_timestep_idx)
+    end
+
+    max_err = zeros(n_timesteps, n_periods)
     total_err = similar(steps, Float64)
 
-    for (i, (err, curve_idx, segment_idx)) in enumerate(steps)
-        max_err[curve_idx] = err
+    for (i, (err, _, t, p)) in enumerate(steps)
+        max_err[t, p] = err
         total_err[i] = sum(max_err)
     end
 
