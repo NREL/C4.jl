@@ -6,9 +6,16 @@ using C4.ExpansionModel
 using C4.IterationModel
 
 import HiGHS
+import JuMP: optimizer_with_attributes
 
 include("ExpansionModel/sequencing.jl")
 include("IterationModel/eue_estimator.jl")
+
+optimizer = optimizer_with_attributes(
+    HiGHS.Optimizer,
+    "log_to_console" => false,
+)
+
 
 sys = System("Data/toysystem")
 display(sys)
@@ -16,15 +23,15 @@ display(sys)
 fullchrono = fullchronologyperiods(sys, daylength=2)
 repeatedchrono = singleperiod(sys, daylength=2)
 
-eue_estimator = nullestimator(sys, s -> fullchronologyperiods(s, daylength=2))
+eue_estimator = nullestimator(sys, fullchrono)
 max_eues = zeros(3)
 
 @time ram = AdequacyProblem(sys)
 @time adequacy = assess(ram, samples=1000)
 println("NEUE: ", adequacy.region_neue)
 
-@time cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, HiGHS.Optimizer)
-@time cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, HiGHS.Optimizer)
+@time cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
+@time cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)
 
 @time solve!(cem)
 println("System Cost: ", cost(cem))
@@ -38,13 +45,13 @@ display(sys_built)
 println("NEUE: ", adequacy.region_neue)
 
 max_neues = ones(3)
-@time cem, adequacy = aspp(sys, fullchrono, max_neues, HiGHS.Optimizer)
+@time cem, adequacy = iterate_ra_cem(sys, fullchrono, max_neues, optimizer)
 println("System Cost: ", cost(cem))
 println("System LCOE: ", lcoe(cem))
 println("NEUE: ", adequacy.region_neue)
 
 neue_tols = fill(0.1, 3)
-@time cem, adequacy = aspp(sys, fullchrono, max_neues, HiGHS.Optimizer, neue_tols=neue_tols)
+@time cem, adequacy = iterate_ra_cem(sys, fullchrono, max_neues, optimizer, neue_tols=neue_tols)
 println("System Cost: ", cost(cem))
 println("System LCOE: ", lcoe(cem))
 println("NEUE: ", adequacy.region_neue)

@@ -42,7 +42,7 @@ function medoid_timegrouping(sys::System, grouper::Function, daylength::Int=24)
 
     end
 
-    println(periods)
+    println("Initial periods: $groups")
     println(days)
     return TimeProxyAssignment(periods, days)
 

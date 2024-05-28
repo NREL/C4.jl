@@ -6,14 +6,15 @@ using C4.ExpansionModel
 
 import JuMP: value
 
-export aspp
+export iterate_ra_cem
 
 include("eue_estimator_compression.jl")
 
-function aspp(
+function iterate_ra_cem(
     sys::System, economic_chronology::ExpansionModel.TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
-    nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[])
+    nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
+    aspp::Bool=true, endog_risk::Bool=true, min_iters::Int=0)
 
     neue_factors = [sum(region.demand) * 1e-6 for region in sys.regions]
     max_eues = max_neues .* neue_factors
@@ -24,24 +25,28 @@ function aspp(
             error("NEUE compression error tolerances must be less than the provided NEUE thresholds")
         eue_tols = neue_tols .* neue_factors
 
-        # We assume the worst and require that NEUE estimate + error <= threshold
+        # We assume the worst and require that NEUE estimate + max_error <= threshold
         max_eues .-= eue_tols
 
     else
         eue_tols = zeros(length(sys.regions))
     end
 
-
     display(sys)
     @time ram = AdequacyProblem(sys)
     @time adequacy = assess(ram, samples=nsamples)
     println(adequacy.region_neue)
-    eue_estimator = nullestimator(sys, s -> economic_chronology)
+
+    # TODO: Figure out good way to jump straight to valid estimator
+    #       (save a round of iteration) - will clean up the while loop too
+    eue_estimator = nullestimator(sys, economic_chronology)
 
     cem = nothing
     n_iters = 0
 
-    while any(neue > max_neue for (neue, max_neue) in zip(adequacy.region_neue, max_neues))
+    is_adequate = all(adequacy.region_neue .<= max_neues)
+
+    while (n_iters < min_iters) || !is_adequate
 
         n_iters += 1
 
@@ -53,7 +58,11 @@ function aspp(
         @time ram = AdequacyProblem(sys)
         @time adequacy = assess(ram, samples=nsamples)
         println(adequacy.region_neue, "\n")
-        eue_estimator = update_estimator(sys, cem, adequacy, eue_estimator, eue_tols)
+
+        is_adequate = all(adequacy.region_neue .<= max_neues)
+
+        eue_estimator = update_estimator(sys, cem, adequacy, eue_estimator, eue_tols,
+                                         aspp=aspp, endog_risk=endog_risk)
 
     end
 
@@ -63,12 +72,22 @@ end
 
 function update_estimator(
     sys::System, cem::ExpansionProblem, adequacy::AdequacyResult,
-    old_estimator::ExpansionModel.EUEEstimator, eue_tols::Vector{Float64}
+    old_estimator::ExpansionModel.EUEEstimator, eue_tols::Vector{Float64};
+    aspp::Bool, endog_risk::Bool
 )
 
-    times = add_stressperiod(old_estimator.times, adequacy)
+    times = if aspp
+        add_stressperiod(sys, old_estimator.times, adequacy)
+    else
+        old_estimator.times
+    end
 
-    new_estimators = estimators(cem, adequacy, times)
+    new_estimators = if endog_risk
+        estimators(cem, adequacy, times)
+    else
+        nullestimator(sys, times)
+    end
+
     new_estimator = ExpansionModel.EUEEstimator(times, new_estimators)
 
     length(eue_tols) > 0 && compress_estimator!(new_estimator, eue_tols)
@@ -77,12 +96,41 @@ function update_estimator(
 
 end
 
-function add_stressperiod(old_times::TimeProxyAssignment, adequacy::AdequacyResult)
+function add_stressperiod(
+    sys::System, times::TimeProxyAssignment, adequacy::AdequacyResult
+)
 
-    # TODO identify new stress period and create a new TPA with it included
-    return old_times
+    days = reshape(adequacy.period_eue, times.daylength, :)
+    days = vec(sum(days, dims=1))
+    og_new_day = argmax(days)
+
+    new_day = og_new_day
+    new_day_first_hour = (new_day - 1) * 24 + 1
+
+    while already_included(new_day_first_hour, times.periods)
+        new_day = new_day > 1 ? new_day - 1 : length(days)
+        new_day_first_hour = (new_day - 1) * times.daylength + 1
+        if new_day == og_new_day
+            @warn("No unmodeled stress periods left to add")
+            return times
+        end
+    end
+
+    ts = new_day_first_hour:(new_day_first_hour+times.daylength-1)
+    name = string(Date(sys.timesteps[new_day_first_hour])) # TODO
+    new_period = TimePeriod(ts, name)
+    println("Adding period: $name")
+
+    new_periods = [times.periods; new_period]
+    new_days = copy(times.days)
+    new_days[new_day] = length(times.periods)
+
+    return TimeProxyAssignment(new_periods, new_days)
 
 end
+
+already_included(hour::Int, periods::Vector{TimePeriod}) =
+    any(p -> in(hour, p.timesteps), periods)
 
 function estimators(
     cem::ExpansionProblem, adequacy::AdequacyResult, tpa::TimeProxyAssignment)
