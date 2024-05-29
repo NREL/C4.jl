@@ -4,6 +4,7 @@ using C4.Data
 using C4.AdequacyModel
 using C4.ExpansionModel
 
+import Dates: Date
 import JuMP: value
 
 export iterate_ra_cem
@@ -33,8 +34,8 @@ function iterate_ra_cem(
     end
 
     display(sys)
-    @time ram = AdequacyProblem(sys)
-    @time adequacy = assess(ram, samples=nsamples)
+    ram = AdequacyProblem(sys)
+    adequacy = assess(ram, samples=nsamples)
     println(adequacy.region_neue)
 
     # TODO: Figure out good way to jump straight to valid estimator
@@ -50,19 +51,21 @@ function iterate_ra_cem(
 
         n_iters += 1
 
-        @time cem = ExpansionProblem(sys, economic_chronology, eue_estimator, max_eues, optimizer)
-        @time solve!(cem)
-        @time sys = System(cem)
-        display(sys)
+        cem = ExpansionProblem(sys, economic_chronology, eue_estimator, max_eues, optimizer)
+        solve!(cem)
+        sys = System(cem)
+        #display(sys)
 
-        @time ram = AdequacyProblem(sys)
-        @time adequacy = assess(ram, samples=nsamples)
+        ram = AdequacyProblem(sys)
+        adequacy = assess(ram, samples=nsamples)
         println(adequacy.region_neue, "\n")
 
         is_adequate = all(adequacy.region_neue .<= max_neues)
 
         eue_estimator = update_estimator(sys, cem, adequacy, eue_estimator, eue_tols,
                                          aspp=aspp, endog_risk=endog_risk)
+
+        aspp || endog_risk || break
 
     end
 
@@ -76,19 +79,17 @@ function update_estimator(
     aspp::Bool, endog_risk::Bool
 )
 
-    times = if aspp
+    new_times = if aspp
         add_stressperiod(sys, old_estimator.times, adequacy)
     else
         old_estimator.times
     end
 
-    new_estimators = if endog_risk
-        estimators(cem, adequacy, times)
+    new_estimator = if endog_risk
+        ExpansionModel.EUEEstimator(new_times, estimators(cem, adequacy, new_times))
     else
-        nullestimator(sys, times)
+        nullestimator(sys, new_times)
     end
-
-    new_estimator = ExpansionModel.EUEEstimator(times, new_estimators)
 
     length(eue_tols) > 0 && compress_estimator!(new_estimator, eue_tols)
 
@@ -137,6 +138,11 @@ function estimators(
 
     dispatches = cem.reliabilitydispatch.dispatches
 
+    # TODO: cem..dispatches are out-of-date relative to
+    #       (potentially newly-augmented) tpa. We need to use the old
+    #       assignment for the period to find the right surplus_means, then
+    #       use that (with the 1:1 adequacy data) to create a
+    #       new 1:1 PeriodEUEEstimator for the new period
     return [period_estimator(adequacy.shortfall_samples,
                              value.(dispatch.surplus_mean), tpa, p)
             for (p, dispatch) in enumerate(dispatches)]
@@ -176,6 +182,7 @@ function period_estimator(
     return ExpansionModel.PeriodEUEEstimator(eue_ints, eue_slopes)
 
 end
+
 function estimator_params(steps::Vector{Int}, n_samples::Int)
 
     n_steps = length(steps)
