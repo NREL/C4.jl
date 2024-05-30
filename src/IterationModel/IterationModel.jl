@@ -52,6 +52,12 @@ function iterate_ra_cem(
         n_iters += 1
 
         cem = ExpansionProblem(sys, economic_chronology, eue_estimator, max_eues, optimizer)
+
+        println("Recurrences:")
+        for recc in cem.reliabilitydispatch.recurrences
+            println(recc.repetitions, " x ", recc.dispatch.period.name)
+        end
+
         solve!(cem)
         sys = System(cem)
         #display(sys)
@@ -122,9 +128,11 @@ function add_stressperiod(
     new_period = TimePeriod(ts, name)
     println("Adding period: $name")
 
+    # New period must always be added at the end of the list
     new_periods = [times.periods; new_period]
+
     new_days = copy(times.days)
-    new_days[new_day] = length(times.periods)
+    new_days[new_day] = length(new_periods)
 
     return TimeProxyAssignment(new_periods, new_days)
 

@@ -13,13 +13,14 @@ struct GeneratorTechDispatch{G<:GeneratorTechnology}
     ) where G <: GeneratorTechnology
 
         T = length(period)
+        ts = period.timesteps
 
         dispatch = @variable(m, [1:T], lower_bound = 0)
         fullname = join([regionbuild.params.name, genbuild.params.name, period.name], ",")
         varnames!(dispatch, "gen_dispatch[$(fullname)]", 1:T)
 
         dispatch_max = @constraint(m, [t in 1:T],
-            dispatch[t] <= availablecapacity(genbuild, t))
+            dispatch[t] <= availablecapacity(genbuild, ts[t]))
 
         new{G}(dispatch, dispatch_max, genbuild)
 

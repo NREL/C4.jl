@@ -19,6 +19,7 @@ struct RegionEconomicDispatch <: RegionDispatch
     )
 
         T = length(period)
+        ts = period.timesteps
 
         thermaldispatch = [GeneratorTechDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.thermaltechs]
@@ -29,7 +30,8 @@ struct RegionEconomicDispatch <: RegionDispatch
         storagedispatch = [StorageTechDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.storagetechs]
 
-        netload = @expression(m, [t in 1:T], regionbuild.params.demand[t]
+        netload = @expression(m, [t in 1:T],
+                regionbuild.params.demand[ts[t]]
                 - sum(gen.dispatch[t] for gen in thermaldispatch)
                 - sum(gen.dispatch[t] for gen in variabledispatch)
                 - sum(stor.dispatch[t] for stor in storagedispatch))

@@ -15,15 +15,16 @@ struct RegionReliabilityDispatch <: RegionDispatch
     )
 
         T = length(period)
+        ts = period.timesteps
 
         storagedispatch = [StorageTechDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.storagetechs]
 
         surplus_mean = @expression(m, [t in 1:T],
-            sum(availablecapacity(gen, t) for gen in regionbuild.variabletechs)
-            + sum(availablecapacity(gen, t) for gen in regionbuild.thermaltechs)
+            sum(availablecapacity(gen, ts[t]) for gen in regionbuild.variabletechs)
+            + sum(availablecapacity(gen, ts[t]) for gen in regionbuild.thermaltechs)
             + sum(stor.dispatch[t] for stor in storagedispatch)
-            - regionbuild.params.demand[t]
+            - regionbuild.params.demand[ts[t]]
         )
 
         import_interfaces = [interfaces[i] for i in regionbuild.params.import_interfaces]
@@ -36,6 +37,8 @@ struct RegionReliabilityDispatch <: RegionDispatch
 end
 
 struct ReliabilityDispatch <: Dispatch
+
+    period::TimePeriod
 
     regions::Vector{RegionReliabilityDispatch}
     interfaces::Vector{InterfaceDispatch}
@@ -85,7 +88,7 @@ struct ReliabilityDispatch <: Dispatch
                         - surplus_mean[r,t] * slope(eue_estimator, r, t, s)
         )
 
-        new(regions, interfaces, netimports,
+        new(period, regions, interfaces, netimports,
             surplus_mean, surplus_floor,
             eue, eue_segments, build)
 
