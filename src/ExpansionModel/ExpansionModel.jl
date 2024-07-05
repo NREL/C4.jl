@@ -21,7 +21,7 @@ include("dispatch_recurrences.jl")
 include("dispatch_economic.jl")
 include("dispatch_reliability.jl")
 
-export nullestimator, ExpansionProblem, solve!, cost, lcoe,
+export nullestimator, ExpansionProblem, solve!, capex, opex, cost, lcoe,
        TimeProxyAssignment, singleperiod, seasonalperiods, monthlyperiods,
        weeklyperiods, dailyperiods, fullchronologyperiods
 
@@ -66,9 +66,7 @@ mutable struct ExpansionProblem
         reliabilitydispatch = ReliabilityDispatchSequence(
             m, builds, eue_estimator, eue_max)
 
-        # Capex is annualized, so scale opex to approximate an annual cost
         opex_scalar = 8766 / n_timesteps
-
         @objective(m, Min, cost(builds) + opex_scalar * cost(economicdispatch))
 
         return new(m, system, builds, economicdispatch, reliabilitydispatch)
@@ -79,7 +77,12 @@ end
 
 solve!(prob::ExpansionProblem) = JuMP.optimize!(prob.model)
 
-cost(prob::ExpansionProblem) = JuMP.objective_value(prob.model)
+# Capex is annualized, so scale opex to approximate an annual cost
+opex(prob::ExpansionProblem) =
+    8766 / length(prob.system.timesteps) * cost(prob.economicdispatch)
+
+capex(prob::ExpansionProblem) = cost(prob.builds)
+cost(prob::ExpansionProblem) = capex(prob) + opex(prob)
 
 function lcoe(prob::ExpansionProblem)
 

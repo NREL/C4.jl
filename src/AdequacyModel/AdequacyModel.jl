@@ -15,8 +15,11 @@ struct AdequacyProblem
 end
 
 struct AdequacyResult
+    neue::Float64
+    neue_stderr::Float64
     region_neue::Vector{Float64}
     period_eue::Vector{Float64}
+    surplus_mean::Matrix{Float64}
     shortfall_samples::Array{Int,3}
 end
 
@@ -43,10 +46,11 @@ end
 
 function assess(prob::AdequacyProblem; samples::Int)
 
-    simspec = SequentialMonteCarlo(samples=samples)
+    simspec = SequentialMonteCarlo(samples=samples, seed=1)
 
-    sf, sfs, sps = assess(prob.sys, simspec,
-        Shortfall(), ShortfallSamples(), SurplusSamples())
+    sf, sfs, sps, fl, se = assess(prob.sys, simspec,
+        Shortfall(), ShortfallSamples(), SurplusSamples(),
+        Flow(), StorageEnergy())
 
     period_eue = vec(sum(sf.shortfall_mean, dims=1))
     region_eue = vec(sum(sf.shortfall_mean, dims=2))
@@ -54,9 +58,48 @@ function assess(prob::AdequacyProblem; samples::Int)
     region_demand = vec(sum(prob.sys.regions.load, dims=2))
     region_neue = region_eue ./ region_demand .* 1_000_000
 
+    eue = EUE(sf)
+    neue = val(eue) / sum(region_demand) * 1_000_000
+    neue_stderr = stderror(eue) / sum(region_demand) * 1_000_000
+
+    R = length(prob.sys.regions)
+    T = length(prob.sys.timestamps)
+
+    ucap = prob.sys.generators.capacity .*
+        prob.sys.generators.μ ./ (prob.sys.generators.λ .+ prob.sys.generators.μ)
+
+    region_ucap = aggregate(ucap, prob.sys.region_gen_idxs)
+
+    region_net_import = zeros(Float64, R, T)
+    for (i, (from, to)) in enumerate(zip(
+            prob.sys.interfaces.regions_from, prob.sys.interfaces.regions_to))
+        region_net_import[from, :] .-= fl.flow_mean[i, :]
+        region_net_import[to, :] .+= fl.flow_mean[i, :]
+    end
+
+    n_stors = length(se.storages)
+    net_stor_discharge = -diff([zeros(n_stors) se.energy_mean], dims=2)
+    region_net_stor_discharge = aggregate(net_stor_discharge, prob.sys.region_stor_idxs)
+
+    surplus_mean = region_ucap .+ region_net_import .+
+        region_net_stor_discharge .- prob.sys.regions.load
+
     shortfall = sfs.shortfall - sps.surplus
 
-    return AdequacyResult(region_neue, period_eue, shortfall)
+    return AdequacyResult(neue, neue_stderr, region_neue, period_eue,
+                          surplus_mean, shortfall)
+
+end
+
+function aggregate(unit_vals::Matrix{Float64}, idxs::Vector{UnitRange{Int}})
+
+    agg_vals = Matrix{Float64}(undef, length(idxs), size(unit_vals, 2))
+
+    for (i, idx) in enumerate(idxs)
+        agg_vals[i, :] = sum(unit_vals[idx, :], dims=1)
+    end
+
+    return agg_vals
 
 end
 

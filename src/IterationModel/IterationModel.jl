@@ -4,18 +4,68 @@ using C4.Data
 using C4.AdequacyModel
 using C4.ExpansionModel
 
+import DelimitedFiles: writedlm
 import Dates: Date
 import JuMP: value
 
-export iterate_ra_cem
+export iterate_ra_cem, saveprogress
 
 include("eue_estimator_compression.jl")
+
+mutable struct IterationProgress
+
+    t_start::Float64
+
+    times::Vector{Float64}
+    capex::Vector{Float64}
+    opex::Vector{Float64}
+    neue::Vector{Float64}
+    neue_stderr::Vector{Float64}
+
+    function IterationProgress()
+        new(time(), Float64[], Float64[], Float64[], Float64[], Float64[])
+    end
+
+end
+
+function update!(results::IterationProgress, adequacy::AdequacyResult)
+    push!(results.times, time() - results.t_start)
+    push!(results.capex, NaN)
+    push!(results.opex, NaN)
+    push!(results.neue, adequacy.neue)
+    push!(results.neue_stderr, adequacy.neue_stderr)
+    return
+end
+
+function update!(results::IterationProgress, cem::ExpansionProblem, adequacy::AdequacyResult)
+    push!(results.times, time() - results.t_start)
+    push!(results.capex, value(capex(cem)))
+    push!(results.opex, value(opex(cem)))
+    push!(results.neue, adequacy.neue)
+    push!(results.neue_stderr, adequacy.neue_stderr)
+    return
+end
+
+function Base.show(io::IO, results::IterationProgress)
+    display([results.times results.capex results.opex results.neue])
+end
+
+function saveprogress(filename::String, results::IterationProgress)
+    result = ["time" "capex" "opex" "neue" "neue_stder";
+              results.times results.capex results.opex results.neue results.neue_stderr]
+    writedlm(filename, result, ',')
+    return
+end
 
 function iterate_ra_cem(
     sys::System, economic_chronology::ExpansionModel.TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
-    aspp::Bool=true, endog_risk::Bool=true, min_iters::Int=0)
+    min_iters::Int=0, max_iters::Int=999, timeout::Float64=Inf,
+    aspp::Bool=true, endog_risk::Bool=true)
+
+    max_neue = maximum(max_neues)
+    timeout += time()
 
     neue_factors = [sum(region.demand) * 1e-6 for region in sys.regions]
     max_eues = max_neues .* neue_factors
@@ -33,21 +83,21 @@ function iterate_ra_cem(
         eue_tols = zeros(length(sys.regions))
     end
 
-    display(sys)
+    progress = IterationProgress()
+
     ram = AdequacyProblem(sys)
     adequacy = assess(ram, samples=nsamples)
+    update!(progress, adequacy)
     println(adequacy.region_neue)
 
-    # TODO: Figure out good way to jump straight to valid estimator
-    #       (save a round of iteration) - will clean up the while loop too
-    eue_estimator = nullestimator(sys, economic_chronology)
+    eue_estimator = bootstrap_estimator(
+        sys, economic_chronology, adequacy, eue_tols,
+        aspp=aspp, endog_risk=endog_risk)
 
     cem = nothing
     n_iters = 0
 
-    is_adequate = all(adequacy.region_neue .<= max_neues)
-
-    while (n_iters < min_iters) || !is_adequate
+    while (time() < timeout) && (n_iters < max_iters)
 
         n_iters += 1
 
@@ -59,34 +109,53 @@ function iterate_ra_cem(
         end
 
         solve!(cem)
-        sys = System(cem)
-        #display(sys)
 
-        ram = AdequacyProblem(sys)
+        ram = AdequacyProblem(System(cem))
         adequacy = assess(ram, samples=nsamples)
-        println(adequacy.region_neue, "\n")
+        println(adequacy.neue, "\t", adequacy.region_neue, "\n")
 
+        update!(progress, cem, adequacy)
         is_adequate = all(adequacy.region_neue .<= max_neues)
 
-        eue_estimator = update_estimator(sys, cem, adequacy, eue_estimator, eue_tols,
+        eue_estimator = update_estimator(cem, adequacy, eue_estimator, eue_tols,
                                          aspp=aspp, endog_risk=endog_risk)
 
         aspp || endog_risk || break
 
     end
 
-    return cem, adequacy, n_iters
+    return cem, adequacy, progress
+
+end
+
+function bootstrap_estimator(
+    sys::System, time::TimeProxyAssignment, adequacy::AdequacyResult,
+    eue_tols::Vector{Float64}; aspp::Bool, endog_risk::Bool
+)
+
+    if aspp
+        time = add_stressperiod(sys, time, adequacy)
+    end
+
+    if endog_risk
+        estimator = ExpansionModel.EUEEstimator(time, estimators(adequacy, time))
+        length(eue_tols) > 0 && compress_estimator!(estimator, eue_tols)
+    else
+        estimator = nullestimator(sys, time)
+    end
+
+    return estimator
 
 end
 
 function update_estimator(
-    sys::System, cem::ExpansionProblem, adequacy::AdequacyResult,
+    cem::ExpansionProblem, adequacy::AdequacyResult,
     old_estimator::ExpansionModel.EUEEstimator, eue_tols::Vector{Float64};
     aspp::Bool, endog_risk::Bool
 )
 
     new_times = if aspp
-        add_stressperiod(sys, old_estimator.times, adequacy)
+        add_stressperiod(cem.system, old_estimator.times, adequacy)
     else
         old_estimator.times
     end
@@ -94,7 +163,7 @@ function update_estimator(
     new_estimator = if endog_risk
         ExpansionModel.EUEEstimator(new_times, estimators(cem, adequacy, new_times))
     else
-        nullestimator(sys, new_times)
+        nullestimator(cem.system, new_times)
     end
 
     length(eue_tols) > 0 && compress_estimator!(new_estimator, eue_tols)
@@ -128,7 +197,6 @@ function add_stressperiod(
     new_period = TimePeriod(ts, name)
     println("Adding period: $name")
 
-    # New period must always be added at the end of the list
     new_periods = [times.periods; new_period]
 
     new_days = copy(times.days)
@@ -141,19 +209,39 @@ end
 already_included(hour::Int, periods::Vector{TimePeriod}) =
     any(p -> in(hour, p.timesteps), periods)
 
+function estimators(adequacy::AdequacyResult, tpa::TimeProxyAssignment)
+
+    return [
+        period_estimator(adequacy.shortfall_samples, adequacy.surplus_mean, tpa, p)
+        for p in eachindex(tpa.periods)
+    ]
+
+end
+
 function estimators(
     cem::ExpansionProblem, adequacy::AdequacyResult, tpa::TimeProxyAssignment)
 
-    dispatches = cem.reliabilitydispatch.dispatches
+    dispatch_periods = [d.period for d in cem.reliabilitydispatch.dispatches]
 
-    # TODO: cem..dispatches are out-of-date relative to
-    #       (potentially newly-augmented) tpa. We need to use the old
-    #       assignment for the period to find the right surplus_means, then
-    #       use that (with the 1:1 adequacy data) to create a
-    #       new 1:1 PeriodEUEEstimator for the new period
-    return [period_estimator(adequacy.shortfall_samples,
-                             value.(dispatch.surplus_mean), tpa, p)
-            for (p, dispatch) in enumerate(dispatches)]
+    result = similar(tpa.periods, ExpansionModel.PeriodEUEEstimator)
+
+    for (p, period) in enumerate(tpa.periods)
+
+        dispatch_idx = findfirst(isequal(period), dispatch_periods)
+
+        surplus_mean = if isnothing(dispatch_idx)
+            adequacy.surplus_mean
+        else
+            dispatch = cem.reliabilitydispatch.dispatches[dispatch_idx]
+            value.(dispatch.surplus_mean)
+        end
+
+        result[p] =
+            period_estimator(adequacy.shortfall_samples, surplus_mean, tpa, p)
+
+    end
+
+    return result
 
 end
 
@@ -161,25 +249,35 @@ function period_estimator(
     surplus_steps::Array{Int,3}, surplus_mean::Matrix{Float64},
     tpa::TimeProxyAssignment, period_idx::Int)
 
-    R, T = size(surplus_mean)
-    n_samples = size(surplus_steps, 3)
+    R, T_fullchrono, n_samples = size(surplus_steps)
+    T_period = tpa.daylength
 
-    T == tpa.daylength || error("Day length mismatch")
+    size(surplus_mean, 1) == R || error("Region count mismatch")
+
+    const_means = size(surplus_mean, 2) == T_period
+
+    const_means || size(surplus_mean, 2) == T_fullchrono ||
+        error("Day length mismatch")
 
     period_days = [i for (i, day_assignment) in enumerate(tpa.days)
                      if day_assignment==period_idx]
 
-    eue_ints = Matrix{Vector{Float64}}(undef, R, T)
-    eue_slopes = Matrix{Vector{Float64}}(undef, R, T)
+    eue_ints = Matrix{Vector{Float64}}(undef, R, T_period)
+    eue_slopes = Matrix{Vector{Float64}}(undef, R, T_period)
 
-    for r in 1:R, t_period in 1:T
+    for r in 1:R, t_period in 1:T_period
 
         steps = Int[]
-        surplus_rt = round(Int, surplus_mean[r, t_period])
 
         for day in period_days
-            t = (day-1) * T + t_period
+
+            t = (day-1) * T_period + t_period
+
+            t_idx = const_means ? t_period : t
+            surplus_rt = round(Int, surplus_mean[r, t_idx])
+
             append!(steps, surplus_steps[r, t, :] .+ surplus_rt)
+
         end
 
         eue_ints[r, t_period], eue_slopes[r, t_period] =
@@ -218,6 +316,13 @@ function estimator_params(steps::Vector{Int}, n_samples::Int)
         prev_surplus = surplus
         prev_slope = slope
 
+    end
+
+    # These aren't mathematically necessary, but JuMP complains when iterating
+    # over an empty set of constraints
+    if iszero(length(slopes))
+        push!(slopes, 0)
+        push!(intercepts, 0)
     end
 
     return intercepts, slopes
