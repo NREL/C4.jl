@@ -31,6 +31,11 @@ function ThermalSite(build::ThermalSiteBuild)
         site.λ, site.μ)
 end
 
+function warmstart_builds!(build::ThermalSiteBuild, prev_build::ThermalSiteBuild)
+    JuMP.set_start_value(build.units_new, value(prev_build.units_new))
+    return
+end
+
 struct VariableSiteBuild <: ResourceSiteBuild
 
     params::VariableSite
@@ -60,6 +65,11 @@ function VariableSite(build::VariableSiteBuild)
         site.capacity_existing + new_capacity,
         site.capacity_new_max - new_capacity,
         site.availability)
+end
+
+function warmstart_builds!(build::VariableSiteBuild, prev_build::VariableSiteBuild)
+    JuMP.set_start_value(build.capacity_new, value(prev_build.capacity_new))
+    return
 end
 
 struct StorageSiteBuild <: ResourceSiteBuild
@@ -107,6 +117,12 @@ function StorageSite(build::StorageSiteBuild)
         site.energy_new_max - new_energy)
 end
 
+function warmstart_builds!(build::StorageSiteBuild, prev_build::StorageSiteBuild)
+    JuMP.set_start_value(build.power_new, value(prev_build.power_new))
+    JuMP.set_start_value(build.energy_new, value(prev_build.energy_new))
+    return
+end
+
 struct TechnologyBuild{T<:ResourceTechnology,B<:ResourceSiteBuild}
 
     params::T
@@ -127,10 +143,15 @@ struct TechnologyBuild{T<:ResourceTechnology,B<:ResourceSiteBuild}
 
 end
 
-const ThermalBuild = TechnologyBuild{ThermalTechnology}
-const VariableBuild = TechnologyBuild{VariableTechnology}
+function warmstart_builds!(build::T, prev_build::T) where {T <: TechnologyBuild}
+    warmstart_builds!.(build.sites, prev_build.sites)
+    return
+end
+
+const ThermalBuild = TechnologyBuild{ThermalTechnology,ThermalSiteBuild}
+const VariableBuild = TechnologyBuild{VariableTechnology,VariableSiteBuild}
 const GeneratorBuild = TechnologyBuild{<:GeneratorTechnology}
-const StorageBuild = TechnologyBuild{StorageTechnology}
+const StorageBuild = TechnologyBuild{StorageTechnology,StorageSiteBuild}
 
 nameplatecapacity(build::ThermalBuild) = sum(
         (site.params.units_existing + site.units_new) * build.params.unit_size
@@ -232,6 +253,13 @@ function Region(build::RegionBuild)
         region.export_interfaces, region.import_interfaces)
 end
 
+function warmstart_builds!(build::RegionBuild, prev_build::RegionBuild)
+    warmstart_builds!.(build.thermaltechs, prev_build.thermaltechs)
+    warmstart_builds!.(build.variabletechs, prev_build.variabletechs)
+    warmstart_builds!.(build.storagetechs, prev_build.storagetechs)
+    return
+end
+
 struct InterfaceBuild
 
     params::Interface
@@ -258,6 +286,11 @@ function Interface(build::InterfaceBuild)
         iface.name, iface.region_from, iface.region_to, iface.cost_capital,
         iface.capacity_existing + new_capacity,
         iface.capacity_new_max - new_capacity)
+end
+
+function warmstart_builds!(build::InterfaceBuild, prev_build::InterfaceBuild)
+    JuMP.set_start_value(build.capacity_new, value(prev_build.capacity_new))
+    return
 end
 
 struct Builds

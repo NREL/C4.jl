@@ -95,6 +95,7 @@ function iterate_ra_cem(
         aspp=aspp, endog_risk=endog_risk)
 
     cem = nothing
+    prev_cem = nothing
     n_iters = 0
 
     while (time() < timeout) && (n_iters < max_iters)
@@ -102,6 +103,7 @@ function iterate_ra_cem(
         n_iters += 1
 
         cem = ExpansionProblem(sys, economic_chronology, eue_estimator, max_eues, optimizer)
+        isnothing(prev_cem) || warmstart_builds!(cem, prev_cem)
 
         println("Recurrences:")
         for recc in cem.reliabilitydispatch.recurrences
@@ -119,6 +121,8 @@ function iterate_ra_cem(
 
         eue_estimator = update_estimator(cem, adequacy, eue_estimator, eue_tols,
                                          aspp=aspp, endog_risk=endog_risk)
+
+        prev_cem = cem
 
         aspp || endog_risk || break
 

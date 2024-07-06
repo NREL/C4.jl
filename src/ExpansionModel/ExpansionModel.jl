@@ -21,7 +21,8 @@ include("dispatch_recurrences.jl")
 include("dispatch_economic.jl")
 include("dispatch_reliability.jl")
 
-export nullestimator, ExpansionProblem, solve!, capex, opex, cost, lcoe,
+export nullestimator, ExpansionProblem, warmstart_builds!, solve!,
+       capex, opex, cost, lcoe,
        TimeProxyAssignment, singleperiod, seasonalperiods, monthlyperiods,
        weeklyperiods, dailyperiods, fullchronologyperiods
 
@@ -99,5 +100,11 @@ System(prob::ExpansionProblem) = System(
     prob.system.name, prob.system.timesteps,
     Region.(prob.builds.regions), Interface.(prob.builds.interfaces)
 )
+
+function warmstart_builds!(prob::ExpansionProblem, prev_prob::ExpansionProblem)
+    warmstart_builds!.(prob.builds.regions, prev_prob.builds.regions)
+    warmstart_builds!.(prob.builds.interfaces, prev_prob.builds.interfaces)
+    return
+end
 
 end
