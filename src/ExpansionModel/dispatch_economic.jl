@@ -1,19 +1,19 @@
 struct RegionEconomicDispatch <: RegionDispatch
 
-    thermaltechs::Vector{GeneratorTechDispatch}
-    variabletechs::Vector{GeneratorTechDispatch}
-    storagetechs::Vector{StorageTechDispatch}
+    thermaltechs::Vector{GeneratorDispatch}
+    variabletechs::Vector{GeneratorDispatch}
+    storagetechs::Vector{StorageDispatch}
 
     netload::Vector{JuMP_ExpressionRef}
 
     import_interfaces::Vector{InterfaceDispatch}
     export_interfaces::Vector{InterfaceDispatch}
 
-    build::RegionBuild
+    build::RegionExpansion
 
     function RegionEconomicDispatch(
         m::JuMP.Model,
-        regionbuild::RegionBuild,
+        regionbuild::RegionExpansion,
         interfaces::Vector{InterfaceDispatch},
         period::TimePeriod
     )
@@ -21,13 +21,13 @@ struct RegionEconomicDispatch <: RegionDispatch
         T = length(period)
         ts = period.timesteps
 
-        thermaldispatch = [GeneratorTechDispatch(m, regionbuild, techbuild, period)
+        thermaldispatch = [GeneratorDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.thermaltechs]
 
-        variabledispatch = [GeneratorTechDispatch(m, regionbuild, techbuild, period)
+        variabledispatch = [GeneratorDispatch(m, regionbuild, techbuild, period)
                             for techbuild in regionbuild.variabletechs]
 
-        storagedispatch = [StorageTechDispatch(m, regionbuild, techbuild, period)
+        storagedispatch = [StorageDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.storagetechs]
 
         netload = @expression(m, [t in 1:T],
@@ -58,9 +58,9 @@ struct EconomicDispatch <: Dispatch
     netimports::Matrix{JuMP_ExpressionRef}
     powerbalance::Matrix{JuMP_EqualToConstraintRef}
 
-    build::Builds
+    build::SystemExpansion
 
-    function EconomicDispatch(m::JuMP.Model, build::Builds, period::TimePeriod)
+    function EconomicDispatch(m::JuMP.Model, build::SystemExpansion, period::TimePeriod)
 
         T = length(period)
         R = length(build.regions)
@@ -95,7 +95,7 @@ struct EconomicDispatchSequence
     dispatches::Vector{EconomicDispatch}
     recurrences::Vector{DispatchRecurrence{EconomicDispatch}}
 
-    function EconomicDispatchSequence(m::JuMP.Model, builds::Builds, time::TimeProxyAssignment)
+    function EconomicDispatchSequence(m::JuMP.Model, builds::SystemExpansion, time::TimeProxyAssignment)
 
         dispatches = [EconomicDispatch(m, builds, period) for period in time.periods]
 

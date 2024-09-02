@@ -10,7 +10,7 @@ struct StorageSiteDispatchRecurrence
     function StorageSiteDispatchRecurrence(
         m::JuMP.Model,
         prev_recurrence::Union{StorageSiteDispatchRecurrence,Nothing},
-        build::StorageSiteBuild, dispatch::StorageSiteDispatch, repetitions::Int)
+        build::StorageSiteExpansion, dispatch::StorageSiteDispatch, repetitions::Int)
 
         energy = maxenergy(build)
 
@@ -30,15 +30,15 @@ struct StorageSiteDispatchRecurrence
 
 end
 
-struct StorageTechDispatchRecurrence
+struct StorageDispatchRecurrence
 
     sites::Vector{StorageSiteDispatchRecurrence}
 
-    function StorageTechDispatchRecurrence(
+    function StorageDispatchRecurrence(
         m::JuMP.Model,
-        prev_recurrence::Union{StorageTechDispatchRecurrence,Nothing},
-        build::TechnologyBuild{StorageTechnology,StorageSiteBuild},
-        dispatch::StorageTechDispatch, repetitions::Int
+        prev_recurrence::Union{StorageDispatchRecurrence,Nothing},
+        build::StorageExpansion,
+        dispatch::StorageDispatch, repetitions::Int
     )
 
         prev_recurrence_sites = isnothing(prev_recurrence) ?
@@ -59,19 +59,19 @@ end
 
 struct RegionDispatchRecurrence
 
-    storagetechs::Vector{StorageTechDispatchRecurrence}
+    storagetechs::Vector{StorageDispatchRecurrence}
 
     function RegionDispatchRecurrence(
         m::JuMP.Model,
         prev_recurrence::Union{RegionDispatchRecurrence,Nothing},
-        build::RegionBuild, dispatch::D, repetitions::Int
+        build::RegionExpansion, dispatch::D, repetitions::Int
     ) where D <: RegionDispatch
 
         prev_recurrence_storagetechs = isnothing(prev_recurrence) ?
-            StorageTechDispatchRecurrence[] : prev_recurrence.storagetechs
+            StorageDispatchRecurrence[] : prev_recurrence.storagetechs
 
         storagetechs = [
-            StorageTechDispatchRecurrence(
+            StorageDispatchRecurrence(
                 m, prev_techrecurrence, techbuild, techdispatch, repetitions)
             for (prev_techrecurrence, techbuild, techdispatch)
             in zip_longest(prev_recurrence_storagetechs, build.storagetechs, dispatch.storagetechs)
@@ -92,7 +92,7 @@ struct DispatchRecurrence{D <: Dispatch}
 
     function DispatchRecurrence(
         m::JuMP.Model, prev_recurrence::Union{DispatchRecurrence{D},Nothing},
-        build::Builds, dispatch::D, repetitions::Int
+        build::SystemExpansion, dispatch::D, repetitions::Int
     ) where D <: Dispatch
 
         prev_recurrence_regions = isnothing(prev_recurrence) ?
@@ -114,7 +114,7 @@ cost(recurrence::DispatchRecurrence) =
     cost(recurrence.dispatch) * recurrence.repetitions
 
 function sequence_recurrences(
-    m::JuMP.Model, builds::Builds, dispatches::Vector{D}, time::TimeProxyAssignment
+    m::JuMP.Model, builds::SystemExpansion, dispatches::Vector{D}, time::TimeProxyAssignment
 ) where D <: Dispatch
 
     sequence = deduplicate(time.days)

@@ -9,7 +9,8 @@ applying the `grouper` function to one of the periods in each "day".
 Note that while `daylength` defaults to 24-hour periods, "days" could in theory
 be longer or shorter as well (e.g. 12 hours, 48 hours, etc).
 """
-function medoid_timegrouping(sys::System, grouper::Function, daylength::Int=24)
+function medoid_timegrouping(
+    sys::SystemParams, grouper::Function, daylength::Int=24)
 
     days = reshape(sys.timesteps, daylength, :)
     firstperiods = vec(days[1,:])
@@ -48,22 +49,22 @@ function medoid_timegrouping(sys::System, grouper::Function, daylength::Int=24)
 
 end
 
-singleperiod(sys::System; daylength::Int=24) =
+singleperiod(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, x -> "Representative Period", daylength)
 
-seasonalperiods(sys::System; daylength::Int=24) =
+seasonalperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, season, daylength)
 
-monthlyperiods(sys::System; daylength::Int=24) =
+monthlyperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, monthname, daylength)
 
-weeklyperiods(sys::System; daylength::Int=24) =
+weeklyperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, x -> "Week $(week(x))", daylength)
 
-dailyperiods(sys::System; daylength::Int=24) =
+dailyperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, string ∘ Date, daylength)
 
-fullchronologyperiods(sys::System; daylength::Int=24) =
+fullchronologyperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, string, daylength)
 
 function season(dt::DateTime)
@@ -79,7 +80,7 @@ function season(dt::DateTime)
     end
 end
 
-function num_features(sys::System)
+function num_features(sys::SystemParams)
 
     techs = Set{String}()
 
@@ -97,7 +98,7 @@ end
 Feature vector of average capacity factor for each technology
 + average demand, for the time period corresponding to ts
 """
-function extract_features(sys::System, n_features::Int, ts::UnitRange{Int})
+function extract_features(sys::SystemParams, n_features::Int, ts::UnitRange{Int})
 
     demand = 0.
     tech_cfs = Dict{String,Vector{Float64}}()

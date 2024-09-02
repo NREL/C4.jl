@@ -17,7 +17,7 @@ optimizer = optimizer_with_attributes(
 )
 
 
-sys = System("Data/toysystem")
+sys = SystemParams("Data/toysystem")
 display(sys)
 
 fullchrono = fullchronologyperiods(sys, daylength=2)
@@ -37,7 +37,7 @@ println("NEUE: ", adequacy.region_neue)
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
 
-sys_built = System(cem)
+sys_built = SystemParams(cem)
 display(sys_built)
 
 @time ram = AdequacyProblem(sys_built)

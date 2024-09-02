@@ -30,15 +30,15 @@ mutable struct ExpansionProblem
 
     model::JuMP.Model
 
-    system::System
+    system::SystemParams
 
-    builds::Builds
+    builds::SystemExpansion
 
     economicdispatch::EconomicDispatchSequence
     reliabilitydispatch::ReliabilityDispatchSequence
 
     function ExpansionProblem(
-        system::System,
+        system::SystemParams,
         economic_periods::TimeProxyAssignment,
         eue_estimator::EUEEstimator,
         eue_max::Vector{Float64},
@@ -58,9 +58,9 @@ mutable struct ExpansionProblem
 
         m = JuMP.Model(optimizer)
 
-        builds = Builds(
-            [RegionBuild(m, r) for r in system.regions],
-            [InterfaceBuild(m, i) for i in system.interfaces])
+        builds = SystemExpansion(
+            [RegionExpansion(m, r) for r in system.regions],
+            [InterfaceExpansion(m, i) for i in system.interfaces])
 
         economicdispatch = EconomicDispatchSequence(m, builds, economic_periods)
 
@@ -96,9 +96,9 @@ function lcoe(prob::ExpansionProblem)
     return cost(prob) /  (demand_scaler * total_demand)
 end
 
-System(prob::ExpansionProblem) = System(
+SystemParams(prob::ExpansionProblem) = SystemParams(
     prob.system.name, prob.system.timesteps,
-    Region.(prob.builds.regions), Interface.(prob.builds.interfaces)
+    RegionParams.(prob.builds.regions), InterfaceParams.(prob.builds.interfaces)
 )
 
 function warmstart_builds!(prob::ExpansionProblem, prev_prob::ExpansionProblem)

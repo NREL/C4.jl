@@ -1,6 +1,6 @@
 struct RegionReliabilityDispatch <: RegionDispatch
 
-    storagetechs::Vector{StorageTechDispatch}
+    storagetechs::Vector{StorageDispatch}
 
     surplus_mean::Vector{JuMP_ExpressionRef}
 
@@ -9,7 +9,7 @@ struct RegionReliabilityDispatch <: RegionDispatch
 
     function RegionReliabilityDispatch(
         m::JuMP.Model,
-        regionbuild::RegionBuild,
+        regionbuild::RegionExpansion,
         interfaces::Vector{InterfaceDispatch},
         period::TimePeriod
     )
@@ -17,7 +17,7 @@ struct RegionReliabilityDispatch <: RegionDispatch
         T = length(period)
         ts = period.timesteps
 
-        storagedispatch = [StorageTechDispatch(m, regionbuild, techbuild, period)
+        storagedispatch = [StorageDispatch(m, regionbuild, techbuild, period)
                            for techbuild in regionbuild.storagetechs]
 
         surplus_mean = @expression(m, [t in 1:T],
@@ -51,10 +51,10 @@ struct ReliabilityDispatch <: Dispatch
     eue::Matrix{JuMP.VariableRef}
     eue_segments::JuMP.Containers.SparseAxisArray{JuMP_GreaterThanConstraintRef,3,Tuple{Int64,Int64,Int64}}
 
-    build::Builds
+    build::SystemExpansion
 
     function ReliabilityDispatch(
-        m::JuMP.Model, build::Builds, period::TimePeriod,
+        m::JuMP.Model, build::SystemExpansion, period::TimePeriod,
         eue_estimator::PeriodEUEEstimator)
 
         T = length(period)
@@ -107,7 +107,7 @@ struct ReliabilityDispatchSequence
     region_eue_max::Vector{JuMP_LessThanConstraintRef}
 
     function ReliabilityDispatchSequence(
-        m::JuMP.Model, builds::Builds,
+        m::JuMP.Model, builds::SystemExpansion,
         eue_estimator::EUEEstimator, eue_max::Vector{Float64})
 
         dispatches = [ReliabilityDispatch(m, builds, period, period_estimator)

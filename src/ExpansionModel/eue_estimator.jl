@@ -50,7 +50,7 @@ end
 allperiods(ee::EUEEstimator) =
     [(period, ee.estimators[i]) for (i, period) in enumerate(ee.times.periods)]
 
-function nullestimator(system::System, times::TimeProxyAssignment)
+function nullestimator(system::SystemParams, times::TimeProxyAssignment)
 
     zero_matrix = fill([0.], length(system.regions), times.daylength)
 

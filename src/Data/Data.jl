@@ -4,9 +4,11 @@ using Dates, DelimitedFiles
 
 import Base: length
 
-export availability, TimePeriod, Region, ResourceTechnology,
-       ThermalTechnology, ThermalSite, VariableTechnology, VariableSite,
-       GeneratorTechnology, StorageTechnology, StorageSite, Interface, System
+export availability, TimePeriod, TechnologyParams, GeneratorParams,
+       ThermalParams, ThermalSiteParams,
+       VariableParams, VariableSiteParams,
+       StorageParams, StorageSiteParams,
+       RegionParams, InterfaceParams, SystemParams
 
 include("time.jl")
 include("resources.jl")

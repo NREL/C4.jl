@@ -1,11 +1,11 @@
-function System(datadir::String)
+function SystemParams(datadir::String)
 
     name = basename(datadir)
 
     regions, timesteps = load_regions(datadir)
     interfaces = load_interfaces(datadir, regions)
 
-    system = System(name, timesteps, regions, interfaces)
+    system = SystemParams(name, timesteps, regions, interfaces)
 
     load_thermaltechs!(system, datadir)
     load_thermalsites!(system, datadir)
@@ -31,7 +31,7 @@ function load_regions(datadir::String)
     timestamps == timestamps_raw ||
         error("Input timesteps should be hourly")
 
-    regions = Region[]
+    regions = RegionParams[]
     regionnames = Set{String}()
 
     for c in 2:size(data, 2)
@@ -42,12 +42,12 @@ function load_regions(datadir::String)
         regionname in regionnames &&
             error("Region name $regionname is duplicated in $regionpath")
 
-        region = Region(
+        region = RegionParams(
             regionname, demand,
-            ThermalTechnology[],
-            VariableTechnology[],
-            StorageTechnology[],
-            Interface[], Interface[]
+            ThermalParams[],
+            VariableParams[],
+            StorageParams[],
+            Int[], Int[] # Region indices
         )
 
         push!(regionnames, regionname)
@@ -59,10 +59,10 @@ function load_regions(datadir::String)
 
 end
 
-function load_interfaces(datadir::String, regions::Vector{Region})
+function load_interfaces(datadir::String, regions::Vector{RegionParams})
 
     data = readdlm(joinpath(datadir, "transmission.csv"), ',')
-    interfaces = Interface[]
+    interfaces = InterfaceParams[]
 
     for i in 2:size(data, 1)
 
@@ -78,7 +78,7 @@ function load_interfaces(datadir::String, regions::Vector{Region})
         from_idx, region_from = getbyname(regions, region_from)
         to_idx, region_to = getbyname(regions, region_to)
 
-        interface = Interface(
+        interface = InterfaceParams(
             name, from_idx, to_idx, cost_capital,
             capacity_existing, capacity_new_max)
 
@@ -92,7 +92,7 @@ function load_interfaces(datadir::String, regions::Vector{Region})
 
 end
 
-function load_thermaltechs!(system::System, datadir::String)
+function load_thermaltechs!(system::SystemParams, datadir::String)
 
     regions = regionset(system)
     techspath = joinpath(datadir, "thermal/regiontechs.csv")
@@ -110,8 +110,8 @@ function load_thermaltechs!(system::System, datadir::String)
         cost_generation = Float64(techs[r, 4])
         size = Int(techs[r, 5])
 
-        tech = ThermalTechnology(
-            techname, cost_capital, cost_generation, size, ThermalSite[])
+        tech = ThermalParams(
+            techname, cost_capital, cost_generation, size, ThermalSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
         push!(region.thermaltechs, tech)
@@ -120,11 +120,11 @@ function load_thermaltechs!(system::System, datadir::String)
 
 end
 
-function load_thermalsites!(system::System, datadir::String)
+function load_thermalsites!(system::SystemParams, datadir::String)
 
     n_timesteps = length(system.timesteps)
 
-    regiontechs = regiontechset(system, ThermalTechnology)
+    regiontechs = regiontechset(system, ThermalParams)
     sitespath = joinpath(datadir, "thermal/sites.csv")
     validator = AddValidator{String}(
         "region-technology pair", regiontechs, "site", sitespath)
@@ -142,24 +142,24 @@ function load_thermalsites!(system::System, datadir::String)
         units_existing = Int(sites[r, 4])
         units_new_max = Int(sites[r, 5])
 
-        site = ThermalSite(
+        site = ThermalSiteParams(
             sitename, units_existing, units_new_max,
             zeros(n_timesteps), ones(n_timesteps))
 
-        tech = get_tech(system, ThermalTechnology, regionname, techname)
+        tech = get_tech(system, ThermalParams, regionname, techname)
         push!(tech.sites, site)
 
     end
 
     mttfpath = joinpath(datadir, "thermal/mttf.csv")
-    load_sites_timeseries!(system, ThermalTechnology, mttfpath, :λ, x -> 1/x)
+    load_sites_timeseries!(system, ThermalParams, mttfpath, :λ, x -> 1/x)
 
     mttrpath = joinpath(datadir, "thermal/mttr.csv")
-    load_sites_timeseries!(system, ThermalTechnology, mttrpath, :μ, x -> 1/x)
+    load_sites_timeseries!(system, ThermalParams, mttrpath, :μ, x -> 1/x)
 
 end
 
-function load_variabletechs!(system::System, datadir::String)
+function load_variabletechs!(system::SystemParams, datadir::String)
 
     regions = regionset(system)
     techspath = joinpath(datadir, "variable/regiontechs.csv")
@@ -177,8 +177,8 @@ function load_variabletechs!(system::System, datadir::String)
         cost_capital = Float64(techs[r, 3])
         cost_generation = Float64(techs[r, 4])
 
-        tech = VariableTechnology(
-            techname, cost_capital, cost_generation, VariableSite[])
+        tech = VariableParams(
+            techname, cost_capital, cost_generation, VariableSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
         push!(region.variabletechs, tech)
@@ -187,11 +187,11 @@ function load_variabletechs!(system::System, datadir::String)
 
 end
 
-function load_variablesites!(system::System, datadir::String)
+function load_variablesites!(system::SystemParams, datadir::String)
 
     n_timesteps = length(system.timesteps)
 
-    regiontechs = regiontechset(system, VariableTechnology)
+    regiontechs = regiontechset(system, VariableParams)
     sitespath = joinpath(datadir, "variable/sites.csv")
     validator = AddValidator{String}(
         "region-technology pair", regiontechs, "site", sitespath)
@@ -209,21 +209,21 @@ function load_variablesites!(system::System, datadir::String)
         capacity_existing = Float64(sites[r, 4])
         capacity_new_max = Float64(sites[r, 5])
 
-        site = VariableSite(
+        site = VariableSiteParams(
             sitename, capacity_existing, capacity_new_max,
             zeros(n_timesteps))
 
-        tech = get_tech(system, VariableTechnology, regionname, techname)
+        tech = get_tech(system, VariableParams, regionname, techname)
         push!(tech.sites, site)
 
     end
 
     availabilitiespath = joinpath(datadir, "variable/availability.csv")
-    load_sites_timeseries!(system, VariableTechnology, availabilitiespath, :availability)
+    load_sites_timeseries!(system, VariableParams, availabilitiespath, :availability)
 
 end
 
-function load_storagetechs!(system::System, datadir::String)
+function load_storagetechs!(system::SystemParams, datadir::String)
 
     regions = regionset(system)
     techspath = joinpath(datadir, "storage/regiontechs.csv")
@@ -241,8 +241,8 @@ function load_storagetechs!(system::System, datadir::String)
         cost_capital_power = Float64(techs[r, 3])
         cost_capital_energy = Float64(techs[r, 4])
 
-        tech = StorageTechnology(
-            techname, cost_capital_power, cost_capital_energy, VariableSite[])
+        tech = StorageParams(
+            techname, cost_capital_power, cost_capital_energy, StorageSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
         push!(region.storagetechs, tech)
@@ -251,9 +251,9 @@ function load_storagetechs!(system::System, datadir::String)
 
 end
 
-function load_storagesites!(system::System, datadir::String)
+function load_storagesites!(system::SystemParams, datadir::String)
 
-    regiontechs = regiontechset(system, StorageTechnology)
+    regiontechs = regiontechset(system, StorageParams)
     sitespath = joinpath(datadir, "storage/sites.csv")
     validator = AddValidator{String}(
         "region-technology pair", regiontechs, "site", sitespath)
@@ -274,11 +274,11 @@ function load_storagesites!(system::System, datadir::String)
         energy_existing = Float64(sites[r, 6])
         energy_new_max = Float64(sites[r, 7])
 
-        site = StorageSite(
+        site = StorageSiteParams(
             sitename, power_existing, power_new_max,
             energy_existing, energy_new_max)
 
-        tech = get_tech(system, StorageTechnology, regionname, techname)
+        tech = get_tech(system, StorageParams, regionname, techname)
         push!(tech.sites, site)
 
     end
@@ -286,8 +286,8 @@ function load_storagesites!(system::System, datadir::String)
 end
 
 function load_sites_timeseries!(
-    system::System, techtype::Type{<:ResourceTechnology}, datapath::String,
-    field::Symbol, transformer::Function=identity
+    system::SystemParams, techtype::Type{<:TechnologyParams},
+    datapath::String, field::Symbol, transformer::Function=identity
 )
 
     validator = UpdateValidator(

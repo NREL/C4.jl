@@ -1,7 +1,7 @@
-abstract type ResourceTechnology end
-abstract type ResourceSite end
+abstract type TechnologyParams end
+abstract type SiteParams end
 
-struct ThermalSite <: ResourceSite
+struct ThermalSiteParams <: SiteParams
 
     name::String
 
@@ -13,9 +13,10 @@ struct ThermalSite <: ResourceSite
 
 end
 
-availability(site::ThermalSite, t::Int) = site.μ[t] / (site.λ[t] + site.μ[t])
+availability(site::ThermalSiteParams, t::Int) =
+    site.μ[t] / (site.λ[t] + site.μ[t])
 
-struct ThermalTechnology <: ResourceTechnology
+struct ThermalParams <: TechnologyParams
 
     name::String
 
@@ -24,17 +25,17 @@ struct ThermalTechnology <: ResourceTechnology
 
     unit_size::Int # MW/unit
 
-    sites::Vector{ThermalSite}
+    sites::Vector{ThermalSiteParams}
 
 end
 
-num_units(tech::ThermalTechnology) =
+num_units(tech::ThermalParams) =
     sum(site.units_existing for site in tech.sites; init=0)
 
-nameplatecapacity(tech::ThermalTechnology) =
+nameplatecapacity(tech::ThermalParams) =
     num_units(tech) * tech.unit_size
 
-struct VariableSite <: ResourceSite
+struct VariableSiteParams <: SiteParams
 
     name::String
 
@@ -45,25 +46,25 @@ struct VariableSite <: ResourceSite
 
 end
 
-availability(site::VariableSite, t::Int) = site.availability[t]
+availability(site::VariableSiteParams, t::Int) = site.availability[t]
 
-struct VariableTechnology <: ResourceTechnology
+struct VariableParams <: TechnologyParams
 
     name::String
 
     cost_capital::Float64 # $/MW
     cost_generation::Float64 # $/MWh
 
-    sites::Vector{VariableSite}
+    sites::Vector{VariableSiteParams}
 
 end
 
-nameplatecapacity(tech::VariableTechnology) =
+nameplatecapacity(tech::VariableParams) =
     sum(site.capacity_existing for site in tech.sites; init=0)
 
-const GeneratorTechnology = Union{ThermalTechnology,VariableTechnology}
+const GeneratorParams = Union{ThermalParams,VariableParams}
 
-struct StorageSite <: ResourceSite
+struct StorageSiteParams <: SiteParams
 
     name::String
 
@@ -75,26 +76,24 @@ struct StorageSite <: ResourceSite
 
 end
 
-struct StorageTechnology <: ResourceTechnology
+struct StorageParams <: TechnologyParams
 
     name::String
 
     cost_capital_power::Float64 # $/MW
     cost_capital_energy::Float64 # $/MWh
 
-    sites::Vector{StorageSite}
+    sites::Vector{StorageSiteParams}
 
 end
 
-powerrating(tech::StorageTechnology) =
+powerrating(tech::StorageParams) =
     sum(site.power_existing for site in tech.sites; init=0)
 
-energyrating(tech::StorageTechnology) =
+energyrating(tech::StorageParams) =
     sum(site.energy_existing for site in tech.sites; init=0)
 
-abstract type AbstractRegion end
-
-struct Interface
+struct InterfaceParams
 
     name::String
 
@@ -108,44 +107,47 @@ struct Interface
 
 end
 
-struct Region
+struct RegionParams
 
     name::String
 
     demand::Vector{Float64}
 
-    thermaltechs::Vector{ThermalTechnology}
-    variabletechs::Vector{VariableTechnology}
-    storagetechs::Vector{StorageTechnology}
+    thermaltechs::Vector{ThermalParams}
+    variabletechs::Vector{VariableParams}
+    storagetechs::Vector{StorageParams}
 
     export_interfaces::Vector{Int}
     import_interfaces::Vector{Int}
 
 end
 
-techs(region::Region, ::Type{ThermalTechnology}) = region.thermaltechs
-techs(region::Region, ::Type{VariableTechnology}) = region.variabletechs
-techs(region::Region, ::Type{StorageTechnology}) = region.storagetechs
+techs(region::RegionParams, ::Type{ThermalParams}) =
+    region.thermaltechs
+techs(region::RegionParams, ::Type{VariableParams}) =
+    region.variabletechs
+techs(region::RegionParams, ::Type{StorageParams}) =
+    region.storagetechs
 
-struct System
+struct SystemParams
 
     name::String
 
     timesteps::StepRange{DateTime,Hour}
 
-    regions::Vector{Region}
-    interfaces::Vector{Interface}
+    regions::Vector{RegionParams}
+    interfaces::Vector{InterfaceParams}
 
 end
 
-get_region(system::System, regionname::String) =
+get_region(system::SystemParams, regionname::String) =
     last(getbyname(system.regions, regionname))
 
-regionset(system::System) = Set(r.name for r in system.regions)
+regionset(system::SystemParams) = Set(r.name for r in system.regions)
 
 function get_tech(
-    system::System,
-    techtype::Type{<:ResourceTechnology},
+    system::SystemParams,
+    techtype::Type{<:TechnologyParams},
     regionname::String,
     techname::String
 )
@@ -155,7 +157,7 @@ function get_tech(
 
 end
 
-function regiontechset(system::System, techtype::Type{<:ResourceTechnology})
+function regiontechset(system::SystemParams, techtype::Type{<:TechnologyParams})
     result = Set{Tuple{String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -166,8 +168,8 @@ function regiontechset(system::System, techtype::Type{<:ResourceTechnology})
 end
 
 function get_site(
-    system::System,
-    techtype::Type{<:ResourceTechnology},
+    system::SystemParams,
+    techtype::Type{<:TechnologyParams},
     regionname::String,
     techname::String,
     sitename::String
@@ -179,7 +181,7 @@ function get_site(
 
 end
 
-function regiontechsiteset(system::System, techtype::Type{<:ResourceTechnology})
+function regiontechsiteset(system::SystemParams, techtype::Type{<:TechnologyParams})
     result = Set{Tuple{String,String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -197,7 +199,7 @@ function getbyname(vals::Vector{T}, name::String) where T
     return i, vals[i]
 end
 
-function Base.show(io::IO, ::MIME"text/plain", sys::System)
+function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
 
     r = length(sys.regions)
     i = length(sys.interfaces)

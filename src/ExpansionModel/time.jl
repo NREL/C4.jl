@@ -36,11 +36,11 @@ function add_period!(tpa::TimeProxyAssignment, tp::TimePeriod, ds::Vector{Int})
     return
 end
 
-function daycount(sys::System, daylength::Int)
+function daycount(sys::SystemParams, daylength::Int)
     n_periods = length(sys.timesteps)
     n_days, remainder = divrem(n_periods, daylength)
     iszero(remainder) ||
-        error("System timesteps ($(n_periods)) should be a multiple of daylength ($(daylength))")
+        error("SystemParams timesteps ($(n_periods)) should be a multiple of daylength ($(daylength))")
     return n_days
 end
 

@@ -1,16 +1,16 @@
 # TODO: Differentiate reliability vs economic dispatch in variable names
 
-struct GeneratorTechDispatch{G<:GeneratorTechnology}
+struct GeneratorDispatch{G<:GeneratorExpansion}
 
     dispatch::Vector{JuMP.VariableRef}
     dispatch_max::Vector{JuMP_LessThanConstraintRef}
 
-    build::TechnologyBuild{G}
+    build::G
 
-    function GeneratorTechDispatch(
+    function GeneratorDispatch(
         m::JuMP.Model,
-        regionbuild::RegionBuild, genbuild::TechnologyBuild{G}, period::TimePeriod
-    ) where G <: GeneratorTechnology
+        regionbuild::RegionExpansion, genbuild::G, period::TimePeriod
+    ) where G <: GeneratorExpansion
 
         T = length(period)
         ts = period.timesteps
@@ -28,7 +28,7 @@ struct GeneratorTechDispatch{G<:GeneratorTechnology}
 
 end
 
-cost(dispatch::GeneratorTechDispatch) =
+cost(dispatch::GeneratorDispatch) =
     sum(dispatch.dispatch) * dispatch.build.params.cost_generation
 
 struct StorageSiteDispatch
@@ -46,11 +46,11 @@ struct StorageSiteDispatch
     e_low::JuMP.VariableRef # MWh
     e_low_def::Vector{JuMP_LessThanConstraintRef}
 
-    build::StorageSiteBuild
+    build::StorageSiteExpansion
 
     function StorageSiteDispatch(
-        m::JuMP.Model, regionbuild::RegionBuild, storbuild::StorageBuild,
-        sitebuild::StorageSiteBuild, period::TimePeriod
+        m::JuMP.Model, regionbuild::RegionExpansion, storbuild::StorageExpansion,
+        sitebuild::StorageSiteExpansion, period::TimePeriod
     )
 
         T = length(period)
@@ -81,15 +81,15 @@ struct StorageSiteDispatch
 
 end
 
-struct StorageTechDispatch
+struct StorageDispatch
 
     sites::Vector{StorageSiteDispatch}
     dispatch::Vector{JuMP_ExpressionRef}
 
-    build::StorageBuild
+    build::StorageExpansion
 
-    function StorageTechDispatch(
-        m::JuMP.Model, regionbuild::RegionBuild, storbuild::StorageBuild, period::TimePeriod
+    function StorageDispatch(
+        m::JuMP.Model, regionbuild::RegionExpansion, storbuild::StorageExpansion, period::TimePeriod
     )
 
         T = length(period)
@@ -114,10 +114,10 @@ struct InterfaceDispatch
     flow_min::Vector{JuMP_GreaterThanConstraintRef}
     flow_max::Vector{JuMP_LessThanConstraintRef}
 
-    build::InterfaceBuild
+    build::InterfaceExpansion
 
     function InterfaceDispatch(
-        m::JuMP.Model, iface::InterfaceBuild, period::TimePeriod
+        m::JuMP.Model, iface::InterfaceExpansion, period::TimePeriod
     )
 
         T = length(period)

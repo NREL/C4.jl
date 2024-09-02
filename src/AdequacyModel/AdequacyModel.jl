@@ -23,7 +23,7 @@ struct AdequacyResult
     shortfall_samples::Array{Int,3}
 end
 
-function AdequacyProblem(sys::System)
+function AdequacyProblem(sys::SystemParams)
 
     meta = (N=length(sys.timesteps), L=1, T=Hour, P=MW, E=MWh)
 
@@ -103,7 +103,7 @@ function aggregate(unit_vals::Matrix{Float64}, idxs::Vector{UnitRange{Int}})
 
 end
 
-function load_regions(sys::System, meta)
+function load_regions(sys::SystemParams, meta)
 
     names = [r.name for r in sys.regions]
     load = zeros(Int, length(sys.regions), meta.N)
@@ -116,7 +116,7 @@ function load_regions(sys::System, meta)
 
 end
 
-function load_generators(sys::System, meta)
+function load_generators(sys::SystemParams, meta)
 
     n_regions = length(sys.regions)
     n_gens, has_variable = count_gens(sys)
@@ -182,7 +182,7 @@ Counts the number of PRAS generators in the system.
 Each unit of a thermal tech counts as a new generator, while
 VRE across all techs and sites within a region is pooled.
 """
-function count_gens(sys::System)
+function count_gens(sys::SystemParams)
 
     n_gens = 0
     has_variable = zeros(Bool, length(sys.regions))
@@ -213,7 +213,7 @@ function count_gens(sys::System)
 
 end
 
-function load_storages(sys::System, meta)
+function load_storages(sys::SystemParams, meta)
 
     n_regions = length(sys.regions)
     n_stors = count_stors(sys)
@@ -260,7 +260,7 @@ function load_storages(sys::System, meta)
 
 end
 
-function count_stors(sys::System)
+function count_stors(sys::SystemParams)
     n_stors = 0
     for region in sys.regions
         for tech in region.storagetechs
@@ -274,7 +274,7 @@ function count_stors(sys::System)
     return n_stors
 end
 
-function load_generatorstorages(sys::System, meta)
+function load_generatorstorages(sys::SystemParams, meta)
 
     intvals = zeros(Int, 0, meta.N)
     fltvals = zeros(Float64, 0, meta.N)
@@ -291,7 +291,7 @@ function load_generatorstorages(sys::System, meta)
 
 end
 
-function load_transmission(sys::System, meta)
+function load_transmission(sys::SystemParams, meta)
 
     n_ifaces = length(sys.interfaces)
 

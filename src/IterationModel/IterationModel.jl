@@ -58,7 +58,7 @@ function saveprogress(filename::String, results::IterationProgress)
 end
 
 function iterate_ra_cem(
-    sys::System, economic_chronology::ExpansionModel.TimeProxyAssignment,
+    sys::SystemParams, economic_chronology::ExpansionModel.TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
     min_iters::Int=0, max_iters::Int=999, timeout::Float64=Inf,
@@ -112,7 +112,7 @@ function iterate_ra_cem(
 
         solve!(cem)
 
-        ram = AdequacyProblem(System(cem))
+        ram = AdequacyProblem(SystemParams(cem))
         adequacy = assess(ram, samples=nsamples)
         println(adequacy.neue, "\t", adequacy.region_neue, "\n")
 
@@ -133,7 +133,7 @@ function iterate_ra_cem(
 end
 
 function bootstrap_estimator(
-    sys::System, time::TimeProxyAssignment, adequacy::AdequacyResult,
+    sys::SystemParams, time::TimeProxyAssignment, adequacy::AdequacyResult,
     eue_tols::Vector{Float64}; aspp::Bool, endog_risk::Bool
 )
 
@@ -177,7 +177,7 @@ function update_estimator(
 end
 
 function add_stressperiod(
-    sys::System, times::TimeProxyAssignment, adequacy::AdequacyResult
+    sys::SystemParams, times::TimeProxyAssignment, adequacy::AdequacyResult
 )
 
     days = reshape(adequacy.period_eue, times.daylength, :)
