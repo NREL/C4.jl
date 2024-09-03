@@ -2,6 +2,7 @@ module IterationModel
 
 using C4.Data
 using C4.AdequacyModel
+using C4.DispatchModel
 using C4.ExpansionModel
 
 import DelimitedFiles: writedlm
@@ -58,7 +59,7 @@ function saveprogress(filename::String, results::IterationProgress)
 end
 
 function iterate_ra_cem(
-    sys::SystemParams, economic_chronology::ExpansionModel.TimeProxyAssignment,
+    sys::SystemParams, economic_chronology::TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
     min_iters::Int=0, max_iters::Int=999, timeout::Float64=Inf,
@@ -142,7 +143,7 @@ function bootstrap_estimator(
     end
 
     if endog_risk
-        estimator = ExpansionModel.EUEEstimator(time, estimators(adequacy, time))
+        estimator = EUEEstimator(time, estimators(adequacy, time))
         length(eue_tols) > 0 && compress_estimator!(estimator, eue_tols)
     else
         estimator = nullestimator(sys, time)
@@ -154,7 +155,7 @@ end
 
 function update_estimator(
     cem::ExpansionProblem, adequacy::AdequacyResult,
-    old_estimator::ExpansionModel.EUEEstimator, eue_tols::Vector{Float64};
+    old_estimator::EUEEstimator, eue_tols::Vector{Float64};
     aspp::Bool, endog_risk::Bool
 )
 
@@ -165,7 +166,7 @@ function update_estimator(
     end
 
     new_estimator = if endog_risk
-        ExpansionModel.EUEEstimator(new_times, estimators(cem, adequacy, new_times))
+        EUEEstimator(new_times, estimators(cem, adequacy, new_times))
     else
         nullestimator(cem.system, new_times)
     end
@@ -227,7 +228,7 @@ function estimators(
 
     dispatch_periods = [d.period for d in cem.reliabilitydispatch.dispatches]
 
-    result = similar(tpa.periods, ExpansionModel.PeriodEUEEstimator)
+    result = similar(tpa.periods, PeriodEUEEstimator)
 
     for (p, period) in enumerate(tpa.periods)
 
@@ -289,7 +290,7 @@ function period_estimator(
 
     end
 
-    return ExpansionModel.PeriodEUEEstimator(eue_ints, eue_slopes)
+    return PeriodEUEEstimator(eue_ints, eue_slopes)
 
 end
 

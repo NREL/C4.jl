@@ -286,7 +286,7 @@ function load_storagesites!(system::SystemParams, datadir::String)
 end
 
 function load_sites_timeseries!(
-    system::SystemParams, techtype::Type{<:TechnologyParams},
+    system::SystemParams, techtype::Type{<:Technology},
     datapath::String, field::Symbol, transformer::Function=identity
 )
 

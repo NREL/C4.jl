@@ -1,99 +1,4 @@
-abstract type TechnologyParams end
-abstract type SiteParams end
-
-struct ThermalSiteParams <: SiteParams
-
-    name::String
-
-    units_existing::Int
-    units_new_max::Int
-
-    λ::Vector{Float64}
-    μ::Vector{Float64}
-
-end
-
-availability(site::ThermalSiteParams, t::Int) =
-    site.μ[t] / (site.λ[t] + site.μ[t])
-
-struct ThermalParams <: TechnologyParams
-
-    name::String
-
-    cost_capital::Float64 # $/MW
-    cost_generation::Float64 # $/MWh
-
-    unit_size::Int # MW/unit
-
-    sites::Vector{ThermalSiteParams}
-
-end
-
-num_units(tech::ThermalParams) =
-    sum(site.units_existing for site in tech.sites; init=0)
-
-nameplatecapacity(tech::ThermalParams) =
-    num_units(tech) * tech.unit_size
-
-struct VariableSiteParams <: SiteParams
-
-    name::String
-
-    capacity_existing::Float64
-    capacity_new_max::Float64
-
-    availability::Vector{Float64}
-
-end
-
-availability(site::VariableSiteParams, t::Int) = site.availability[t]
-
-struct VariableParams <: TechnologyParams
-
-    name::String
-
-    cost_capital::Float64 # $/MW
-    cost_generation::Float64 # $/MWh
-
-    sites::Vector{VariableSiteParams}
-
-end
-
-nameplatecapacity(tech::VariableParams) =
-    sum(site.capacity_existing for site in tech.sites; init=0)
-
-const GeneratorParams = Union{ThermalParams,VariableParams}
-
-struct StorageSiteParams <: SiteParams
-
-    name::String
-
-    power_existing::Float64
-    power_new_max::Float64
-
-    energy_existing::Float64
-    energy_new_max::Float64
-
-end
-
-struct StorageParams <: TechnologyParams
-
-    name::String
-
-    cost_capital_power::Float64 # $/MW
-    cost_capital_energy::Float64 # $/MWh
-
-    sites::Vector{StorageSiteParams}
-
-end
-
-powerrating(tech::StorageParams) =
-    sum(site.power_existing for site in tech.sites; init=0)
-
-energyrating(tech::StorageParams) =
-    sum(site.energy_existing for site in tech.sites; init=0)
-
-struct InterfaceParams
+struct InterfaceParams <: Interface
 
     name::String
 
@@ -107,7 +12,10 @@ struct InterfaceParams
 
 end
 
-struct RegionParams
+struct RegionParams <: Region{
+    ThermalParams, VariableParams,
+    StorageParams, StorageSiteParams, InterfaceParams
+}
 
     name::String
 
@@ -122,14 +30,13 @@ struct RegionParams
 
 end
 
-techs(region::RegionParams, ::Type{ThermalParams}) =
-    region.thermaltechs
-techs(region::RegionParams, ::Type{VariableParams}) =
-    region.variabletechs
-techs(region::RegionParams, ::Type{StorageParams}) =
-    region.storagetechs
+name(region::RegionParams) = region.name
 
-struct SystemParams
+techs(region::RegionParams, ::Type{<:ThermalTechnology}) = region.thermaltechs
+techs(region::RegionParams, ::Type{<:VariableTechnology}) = region.variabletechs
+techs(region::RegionParams, ::Type{<:StorageTechnology}) = region.storagetechs
+
+struct SystemParams <: System{RegionParams,InterfaceParams}
 
     name::String
 
@@ -147,7 +54,7 @@ regionset(system::SystemParams) = Set(r.name for r in system.regions)
 
 function get_tech(
     system::SystemParams,
-    techtype::Type{<:TechnologyParams},
+    techtype::Type{<:Technology},
     regionname::String,
     techname::String
 )
@@ -157,7 +64,7 @@ function get_tech(
 
 end
 
-function regiontechset(system::SystemParams, techtype::Type{<:TechnologyParams})
+function regiontechset(system::SystemParams, techtype::Type{<:Technology})
     result = Set{Tuple{String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -169,7 +76,7 @@ end
 
 function get_site(
     system::SystemParams,
-    techtype::Type{<:TechnologyParams},
+    techtype::Type{<:Technology},
     regionname::String,
     techname::String,
     sitename::String
@@ -181,7 +88,7 @@ function get_site(
 
 end
 
-function regiontechsiteset(system::SystemParams, techtype::Type{<:TechnologyParams})
+function regiontechsiteset(system::SystemParams, techtype::Type{<:Technology})
     result = Set{Tuple{String,String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -197,6 +104,14 @@ function getbyname(vals::Vector{T}, name::String) where T
     i = findfirst(x -> x.name == name, vals)
     isnothing(i) && error("Could not find entity with name $name")
     return i, vals[i]
+end
+
+function daycount(sys::SystemParams, daylength::Int)
+    n_periods = length(sys.timesteps)
+    n_days, remainder = divrem(n_periods, daylength)
+    iszero(remainder) ||
+        error("SystemParams timesteps ($(n_periods)) should be a multiple of daylength ($(daylength))")
+    return n_days
 end
 
 function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)

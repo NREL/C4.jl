@@ -1,4 +1,4 @@
-import C4.ExpansionModel: deduplicate
+import C4.DispatchModel: deduplicate
 
 @testset "Period Sequencing Deduplication" begin
 

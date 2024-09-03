@@ -1,6 +1,4 @@
-abstract type SiteExpansion end
-
-struct ThermalSiteExpansion <: SiteExpansion
+struct ThermalSiteExpansion <: ThermalSite
 
     params::ThermalSiteParams
     units_new::JuMP.VariableRef
@@ -19,8 +17,6 @@ struct ThermalSiteExpansion <: SiteExpansion
 
 end
 
-sitebuildtype(::Type{ThermalParams}) = ThermalSiteExpansion
-
 function ThermalSiteParams(build::ThermalSiteExpansion)
     site = build.params
     new_units = round(Int, value(build.units_new))
@@ -36,7 +32,7 @@ function warmstart_builds!(build::ThermalSiteExpansion, prev_build::ThermalSiteE
     return
 end
 
-struct VariableSiteExpansion <: SiteExpansion
+struct VariableSiteExpansion <: VariableSite
 
     params::VariableSiteParams
     capacity_new::JuMP.VariableRef
@@ -55,8 +51,6 @@ struct VariableSiteExpansion <: SiteExpansion
 
 end
 
-sitebuildtype(::Type{VariableParams}) = VariableSiteExpansion
-
 function VariableSiteParams(build::VariableSiteExpansion)
     site = build.params
     new_capacity = value(build.capacity_new)
@@ -72,7 +66,7 @@ function warmstart_builds!(build::VariableSiteExpansion, prev_build::VariableSit
     return
 end
 
-struct StorageSiteExpansion <: SiteExpansion
+struct StorageSiteExpansion <: StorageSite
 
     params::StorageSiteParams
     power_new::JuMP.VariableRef
@@ -96,8 +90,6 @@ struct StorageSiteExpansion <: SiteExpansion
     end
 
 end
-
-sitebuildtype(::Type{StorageParams}) = StorageSiteExpansion
 
 maxpower(build::StorageSiteExpansion) =
     build.params.power_existing + build.power_new
@@ -123,35 +115,23 @@ function warmstart_builds!(build::StorageSiteExpansion, prev_build::StorageSiteE
     return
 end
 
-struct TechnologyExpansion{T<:TechnologyParams,B<:SiteExpansion}
+struct ThermalExpansion <: ThermalTechnology
 
-    params::T
-    sites::Vector{B}
+    params::ThermalParams
+    sites::Vector{ThermalSiteExpansion}
 
-    function TechnologyExpansion(
-        m::JuMP.Model, techparams::T, regionparams::RegionParams
-    ) where T <: TechnologyParams
+    function ThermalExpansion(
+        m::JuMP.Model, techparams::ThermalParams, regionparams::RegionParams
+    )
 
-        B = sitebuildtype(T)
-
-        sites = [B(m, siteparams, techparams, regionparams)
+        sites = [ThermalSiteExpansion(m, siteparams, techparams, regionparams)
                  for siteparams in techparams.sites]
 
-        new{T,B}(techparams, sites)
+        new(techparams, sites)
 
     end
 
 end
-
-function warmstart_builds!(build::T, prev_build::T) where {T <: TechnologyExpansion}
-    warmstart_builds!.(build.sites, prev_build.sites)
-    return
-end
-
-const ThermalExpansion = TechnologyExpansion{ThermalParams,ThermalSiteExpansion}
-const VariableExpansion = TechnologyExpansion{VariableParams,VariableSiteExpansion}
-const GeneratorExpansion = Union{ThermalExpansion,VariableExpansion}
-const StorageExpansion = TechnologyExpansion{StorageParams,StorageSiteExpansion}
 
 nameplatecapacity(build::ThermalExpansion) = sum(
         (site.params.units_existing + site.units_new) * build.params.unit_size
@@ -175,6 +155,24 @@ function ThermalParams(build::ThermalExpansion)
         ThermalSiteParams.(build.sites))
 end
 
+struct VariableExpansion <: VariableTechnology
+
+    params::VariableParams
+    sites::Vector{VariableSiteExpansion}
+
+    function VariableExpansion(
+        m::JuMP.Model, techparams::VariableParams, regionparams::RegionParams
+    )
+
+        sites = [VariableSiteExpansion(m, siteparams, techparams, regionparams)
+                 for siteparams in techparams.sites]
+
+        new(techparams, sites)
+
+    end
+
+end
+
 nameplatecapacity(build::VariableExpansion) = sum(
         (site.params.capacity_existing + site.capacity_new)
         for site in build.sites; init=0)
@@ -195,6 +193,27 @@ function VariableParams(build::VariableExpansion)
         VariableSiteParams.(build.sites))
 end
 
+const GeneratorExpansion = Union{ThermalExpansion,VariableExpansion}
+cost_generation(gen::GeneratorExpansion) = gen.params.cost_generation
+
+struct StorageExpansion <: StorageTechnology
+
+    params::StorageParams
+    sites::Vector{StorageSiteExpansion}
+
+    function StorageExpansion(
+        m::JuMP.Model, techparams::StorageParams, regionparams::RegionParams
+    )
+
+        sites = [StorageSiteExpansion(m, siteparams, techparams, regionparams)
+                 for siteparams in techparams.sites]
+
+        new(techparams, sites)
+
+    end
+
+end
+
 maxpower(build::StorageExpansion) = sum(
     site.params.power_existing + site.power_new for site in build.sites; init=0)
 
@@ -213,54 +232,14 @@ function StorageParams(build::StorageExpansion)
         StorageSiteParams.(build.sites))
 end
 
-struct RegionExpansion
-
-    params::RegionParams
-
-    thermaltechs::Vector{ThermalExpansion}
-    variabletechs::Vector{VariableExpansion}
-    storagetechs::Vector{StorageExpansion}
-
-    function RegionExpansion(m::JuMP.Model, regionparams::RegionParams)
-
-        thermaltechs = [TechnologyExpansion(m, techparams, regionparams)
-                        for techparams in regionparams.thermaltechs]
-
-        variabletechs = [TechnologyExpansion(m, techparams, regionparams)
-                        for techparams in regionparams.variabletechs]
-
-        storagetechs = [TechnologyExpansion(m, techparams, regionparams)
-                        for techparams in regionparams.storagetechs]
-
-        new(regionparams, thermaltechs, variabletechs, storagetechs)
-
-    end
-
-end
-
-cost(build::RegionExpansion) =
-    sum(cost(thermaltech) for thermaltech in build.thermaltechs; init=0) +
-    sum(cost(variabletech) for variabletech in build.variabletechs; init=0) +
-    sum(cost(storagetech) for storagetech in build.storagetechs; init=0)
-
-function RegionParams(build::RegionExpansion)
-    region = build.params
-    return RegionParams(
-        region.name, region.demand,
-        ThermalParams.(build.thermaltechs),
-        VariableParams.(build.variabletechs),
-        StorageParams.(build.storagetechs),
-        region.export_interfaces, region.import_interfaces)
-end
-
-function warmstart_builds!(build::RegionExpansion, prev_build::RegionExpansion)
-    warmstart_builds!.(build.thermaltechs, prev_build.thermaltechs)
-    warmstart_builds!.(build.variabletechs, prev_build.variabletechs)
-    warmstart_builds!.(build.storagetechs, prev_build.storagetechs)
+function warmstart_builds!(
+    build::T, prev_build::T
+) where {T <: Union{GeneratorExpansion,StorageExpansion}}
+    warmstart_builds!.(build.sites, prev_build.sites)
     return
 end
 
-struct InterfaceExpansion
+struct InterfaceExpansion <: Interface
 
     params::InterfaceParams
     capacity_new::JuMP.VariableRef
@@ -293,7 +272,59 @@ function warmstart_builds!(build::InterfaceExpansion, prev_build::InterfaceExpan
     return
 end
 
-struct SystemExpansion
+struct RegionExpansion <: Region{
+    ThermalExpansion, VariableExpansion,
+    StorageExpansion, StorageSiteExpansion, InterfaceExpansion
+}
+
+    params::RegionParams
+
+    thermaltechs::Vector{ThermalExpansion}
+    variabletechs::Vector{VariableExpansion}
+    storagetechs::Vector{StorageExpansion}
+
+    function RegionExpansion(m::JuMP.Model, regionparams::RegionParams)
+
+        thermaltechs = [ThermalExpansion(m, techparams, regionparams)
+                        for techparams in regionparams.thermaltechs]
+
+        variabletechs = [VariableExpansion(m, techparams, regionparams)
+                        for techparams in regionparams.variabletechs]
+
+        storagetechs = [StorageExpansion(m, techparams, regionparams)
+                        for techparams in regionparams.storagetechs]
+
+        new(regionparams, thermaltechs, variabletechs, storagetechs)
+
+    end
+
+end
+
+name(region::RegionExpansion) = region.params.name
+
+cost(build::RegionExpansion) =
+    sum(cost(thermaltech) for thermaltech in build.thermaltechs; init=0) +
+    sum(cost(variabletech) for variabletech in build.variabletechs; init=0) +
+    sum(cost(storagetech) for storagetech in build.storagetechs; init=0)
+
+function RegionParams(build::RegionExpansion)
+    region = build.params
+    return RegionParams(
+        region.name, region.demand,
+        ThermalParams.(build.thermaltechs),
+        VariableParams.(build.variabletechs),
+        StorageParams.(build.storagetechs),
+        region.export_interfaces, region.import_interfaces)
+end
+
+function warmstart_builds!(build::RegionExpansion, prev_build::RegionExpansion)
+    warmstart_builds!.(build.thermaltechs, prev_build.thermaltechs)
+    warmstart_builds!.(build.variabletechs, prev_build.variabletechs)
+    warmstart_builds!.(build.storagetechs, prev_build.storagetechs)
+    return
+end
+
+struct SystemExpansion <: System{RegionExpansion, InterfaceExpansion}
      regions::Vector{RegionExpansion}
      interfaces::Vector{InterfaceExpansion}
 end

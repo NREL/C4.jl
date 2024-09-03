@@ -2,13 +2,14 @@ using Test
 
 using C4.Data
 using C4.AdequacyModel
+using C4.DispatchModel
 using C4.ExpansionModel
 using C4.IterationModel
 
 import HiGHS
 import JuMP: optimizer_with_attributes, value
 
-include("ExpansionModel/sequencing.jl")
+include("DispatchModel/sequencing.jl")
 include("IterationModel/eue_estimator.jl")
 
 optimizer = optimizer_with_attributes(

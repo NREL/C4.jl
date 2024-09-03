@@ -3,28 +3,26 @@ module ExpansionModel
 import JuMP
 import JuMP: @variable, @constraint, @expression, @objective, value
 
-import MathOptInterface
-const MOI = MathOptInterface
-
-import IterTools: zip_longest
+import ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
+       ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
+       ..Interface, ..Region, ..System, ..varnames!,
+       ..availablecapacity, ..maxpower, ..maxenergy,
+       ..name, ..cost, ..cost_generation
 
 using ..Data
+using ..DispatchModel
 
-include("jump_utils.jl")
 include("build.jl")
-include("time.jl")
-include("representative_periods.jl")
-include("eue_estimator.jl")
-
 include("dispatch.jl")
-include("dispatch_recurrences.jl")
-include("dispatch_economic.jl")
-include("dispatch_reliability.jl")
 
-export nullestimator, ExpansionProblem, warmstart_builds!, solve!,
-       capex, opex, cost, lcoe,
-       TimeProxyAssignment, singleperiod, seasonalperiods, monthlyperiods,
-       weeklyperiods, dailyperiods, fullchronologyperiods
+export ExpansionProblem, warmstart_builds!, solve!,
+       capex, opex, cost, lcoe
+
+const ExpansionEconomicDispatch =
+    DispatchSequence{EconomicDispatch{SystemExpansion,RegionExpansion,InterfaceExpansion}}
+
+const ExpansionReliabilityDispatch =
+    DispatchSequence{ReliabilityDispatch{SystemExpansion,RegionExpansion,InterfaceExpansion}}
 
 mutable struct ExpansionProblem
 
@@ -34,8 +32,10 @@ mutable struct ExpansionProblem
 
     builds::SystemExpansion
 
-    economicdispatch::EconomicDispatchSequence
-    reliabilitydispatch::ReliabilityDispatchSequence
+    economicdispatch::ExpansionEconomicDispatch
+
+    reliabilitydispatch::ExpansionReliabilityDispatch
+    reliabilityconstraints::ReliabilityConstraints
 
     function ExpansionProblem(
         system::SystemParams,
@@ -62,15 +62,20 @@ mutable struct ExpansionProblem
             [RegionExpansion(m, r) for r in system.regions],
             [InterfaceExpansion(m, i) for i in system.interfaces])
 
-        economicdispatch = EconomicDispatchSequence(m, builds, economic_periods)
+        economicdispatch = DispatchSequence(
+            EconomicDispatch, m, builds, economic_periods)
 
-        reliabilitydispatch = ReliabilityDispatchSequence(
-            m, builds, eue_estimator, eue_max)
+        reliabilitydispatch = DispatchSequence(
+            ReliabilityDispatch, m, builds, eue_estimator.times)
+
+        reliabilityconstraints = ReliabilityConstraints(
+            m, builds, reliabilitydispatch.dispatches, eue_estimator, eue_max)
 
         opex_scalar = 8766 / n_timesteps
         @objective(m, Min, cost(builds) + opex_scalar * cost(economicdispatch))
 
-        return new(m, system, builds, economicdispatch, reliabilitydispatch)
+        return new(m, system, builds, economicdispatch,
+                   reliabilitydispatch, reliabilityconstraints)
 
     end
 

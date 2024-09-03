@@ -1,0 +1,64 @@
+abstract type Site end
+
+"""
+StorageSite is an abstract type that can be used to instantiate
+dispatch problems. Instances of StorageSite should define:
+```
+maxenergy(::StorageSite)
+```
+"""
+abstract type StorageSite <: Site end
+abstract type GeneratorSite <: Site end
+abstract type ThermalSite <: Site end
+abstract type VariableSite <: Site end
+
+abstract type Technology end
+
+"""
+GeneratorTechnology is an abstract type that can be used to instantiate
+dispatch problems. Instances of GeneratorTechnology should define:
+```
+cost_generation(::GeneratorTechnology)
+capacity_available(::GeneratorTechnology)
+capacity_nameplate(::GeneratorTechnology)
+```
+"""
+abstract type GeneratorTechnology <: Technology end
+function cost_generation end
+function availablecapacity end
+
+"""
+StorageTechnology is an abstract type that can be used to instantiate
+dispatch problems. Instances of StorageTechnology should define:
+```
+rating_power(::StorageTechnology)
+rating_energy(::StorageTechnology)
+```
+"""
+abstract type StorageTechnology <: Technology end
+function maxenergy end
+function maxpower end
+
+abstract type ThermalTechnology <: GeneratorTechnology end
+abstract type VariableTechnology <: GeneratorTechnology end
+
+abstract type Interface end
+
+"""
+Region is an abstract type that can be used to instantiate
+dispatch problems. Instances of Region should define:
+```
+name(::Region)
+demand(::Region, t::Int)
+```
+"""
+abstract type Region{
+    TG<:ThermalTechnology, VG<:VariableTechnology,
+    ST<:StorageTechnology, SS<:StorageSite, I<:Interface}
+end
+function name end
+function demand end
+
+function cost end
+
+abstract type System{R<:Region, I<:Interface} end

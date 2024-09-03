@@ -1,3 +1,8 @@
+import JuMP
+import MathOptInterface
+
+const MOI = MathOptInterface
+
 const JuMP_ExpressionRef = JuMP.GenericAffExpr{Float64,JuMP.VariableRef}
 
 const JuMP_ConstrRef{T} = JuMP.ConstraintRef{JuMP.Model,MOI.ConstraintIndex{

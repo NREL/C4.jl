@@ -10,9 +10,9 @@ struct StorageSiteDispatchRecurrence
     function StorageSiteDispatchRecurrence(
         m::JuMP.Model,
         prev_recurrence::Union{StorageSiteDispatchRecurrence,Nothing},
-        build::StorageSiteExpansion, dispatch::StorageSiteDispatch, repetitions::Int)
+        site::StorageSite, dispatch::StorageSiteDispatch, repetitions::Int)
 
-        energy = maxenergy(build)
+        energy = maxenergy(site)
 
         soc0_first = isnothing(prev_recurrence) ? 0 : prev_recurrence.soc_last
         soc0_last = soc0_first + (repetitions - 1) * dispatch.e_net
@@ -37,7 +37,7 @@ struct StorageDispatchRecurrence
     function StorageDispatchRecurrence(
         m::JuMP.Model,
         prev_recurrence::Union{StorageDispatchRecurrence,Nothing},
-        build::StorageExpansion,
+        storage::StorageTechnology,
         dispatch::StorageDispatch, repetitions::Int
     )
 
@@ -46,9 +46,9 @@ struct StorageDispatchRecurrence
 
         sites = [
             StorageSiteDispatchRecurrence(
-                m, prev_siterecurrence, sitebuild, sitedispatch, repetitions)
-            for (prev_siterecurrence, sitebuild, sitedispatch)
-            in zip_longest(prev_recurrence_sites, build.sites, dispatch.sites)
+                m, prev_siterecurrence, sitestor, sitedispatch, repetitions)
+            for (prev_siterecurrence, sitestor, sitedispatch)
+            in zip_longest(prev_recurrence_sites, storage.sites, dispatch.sites)
         ]
 
         new(sites)
@@ -64,17 +64,17 @@ struct RegionDispatchRecurrence
     function RegionDispatchRecurrence(
         m::JuMP.Model,
         prev_recurrence::Union{RegionDispatchRecurrence,Nothing},
-        build::RegionExpansion, dispatch::D, repetitions::Int
-    ) where D <: RegionDispatch
+        region::Region, dispatch::RegionDispatch, repetitions::Int
+    )
 
-        prev_recurrence_storagetechs = isnothing(prev_recurrence) ?
+        prev_recurrence_stors = isnothing(prev_recurrence) ?
             StorageDispatchRecurrence[] : prev_recurrence.storagetechs
 
         storagetechs = [
             StorageDispatchRecurrence(
-                m, prev_techrecurrence, techbuild, techdispatch, repetitions)
-            for (prev_techrecurrence, techbuild, techdispatch)
-            in zip_longest(prev_recurrence_storagetechs, build.storagetechs, dispatch.storagetechs)
+                m, prev_storrecurrence, stor, stordispatch, repetitions)
+            for (prev_storrecurrence, stor, stordispatch)
+            in zip_longest(prev_recurrence_stors, region.storagetechs, dispatch.storagetechs)
         ]
 
         new(storagetechs)
@@ -83,26 +83,26 @@ struct RegionDispatchRecurrence
 
 end
 
-struct DispatchRecurrence{D <: Dispatch}
+struct DispatchRecurrence{D <: SystemDispatch}
 
-    dispatch::D
+    dispatch::D # Note this is just a reference, data is owned elsewhere
     repetitions::Int
 
     regions::Vector{RegionDispatchRecurrence}
 
     function DispatchRecurrence(
         m::JuMP.Model, prev_recurrence::Union{DispatchRecurrence{D},Nothing},
-        build::SystemExpansion, dispatch::D, repetitions::Int
-    ) where D <: Dispatch
+        system::System, dispatch::D, repetitions::Int
+    ) where D <: SystemDispatch
 
         prev_recurrence_regions = isnothing(prev_recurrence) ?
             RegionDispatchRecurrence[] : prev_recurrence.regions
 
         regions = [
             RegionDispatchRecurrence(
-                m, prev_regionrecurrence, regionbuild, regiondispatch, repetitions)
-            for (prev_regionrecurrence, regionbuild, regiondispatch)
-            in zip_longest(prev_recurrence_regions, build.regions, dispatch.regions)]
+                m, prev_regionrecurrence, region, regiondispatch, repetitions)
+            for (prev_regionrecurrence, region, regiondispatch)
+            in zip_longest(prev_recurrence_regions, system.regions, dispatch.regions)]
 
         new{D}(dispatch, repetitions, regions)
 
@@ -113,18 +113,40 @@ end
 cost(recurrence::DispatchRecurrence) =
     cost(recurrence.dispatch) * recurrence.repetitions
 
+struct DispatchSequence{D <: SystemDispatch}
+
+    time::TimeProxyAssignment
+
+    dispatches::Vector{D}
+    recurrences::Vector{DispatchRecurrence{D}}
+
+    # This is a bit hacky, we want to call EconomicDispatch to generate the
+    # list of dispatches, but need to parametrize the result with
+    # EconomicDispatch{S,R,I}.
+    function DispatchSequence(
+        f::Type{D}, m::JuMP.Model, system::S, time::TimeProxyAssignment
+    ) where {R, I, D <: SystemDispatch, S <: System{R,I}}
+
+        dispatches = [f(m, system, period) for period in time.periods]
+        recurrences = sequence_recurrences(m, system, dispatches, time)
+        new{D{S,R,I}}(time, dispatches, recurrences)
+
+    end
+
+end
+
 function sequence_recurrences(
-    m::JuMP.Model, builds::SystemExpansion, dispatches::Vector{D}, time::TimeProxyAssignment
-) where D <: Dispatch
+    m::JuMP.Model, system::System, dispatches::Vector{D}, time::TimeProxyAssignment
+) where D <: SystemDispatch
 
     sequence = deduplicate(time.days)
-    recurrences = Vector{DispatchRecurrence}(undef, length(sequence))
+    recurrences = Vector{DispatchRecurrence{D}}(undef, length(sequence))
 
     prev_recurrence = nothing
 
     for (i, (p, repetitions)) in enumerate(sequence)
 
-        recurrence = DispatchRecurrence(m, prev_recurrence, builds, dispatches[p], repetitions)
+        recurrence = DispatchRecurrence(m, prev_recurrence, system, dispatches[p], repetitions)
 
         recurrences[i]  = recurrence
         prev_recurrence = recurrence
