@@ -31,13 +31,13 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
                            for tech in region.storagetechs]
 
         netload = @expression(m, [t in 1:T],
-                region.params.demand[ts[t]] # TODO: Abstract demand(region, t)
+                demand(region, ts[t])
                 - sum(gen.dispatch[t] for gen in thermaldispatch)
                 - sum(gen.dispatch[t] for gen in variabledispatch)
                 - sum(stor.dispatch[t] for stor in storagedispatch))
 
-        import_interfaces = [interfaces[i] for i in region.params.import_interfaces]
-        export_interfaces = [interfaces[i] for i in region.params.export_interfaces]
+        import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
+        export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
         new{R,TG,VG,ST,SS,I}(
             thermaldispatch, variabledispatch, storagedispatch,
@@ -93,6 +93,3 @@ end
 
 cost(dispatch::EconomicDispatch) =
     sum(cost(region) for region in dispatch.regions; init=0)
-
-cost(sequence::DispatchSequence{<:EconomicDispatch}) =
-    sum(cost(recurrence) for recurrence in sequence.recurrences; init=0)

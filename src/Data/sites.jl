@@ -13,6 +13,9 @@ end
 availability(site::ThermalSiteParams, t::Int) =
     site.μ[t] / (site.λ[t] + site.μ[t])
 
+availableunits(site::ThermalSiteParams, t::Int) =
+    availability(site, t) * site.units_existing
+
 struct VariableSiteParams <: VariableSite
 
     name::String
@@ -26,6 +29,11 @@ end
 
 availability(site::VariableSiteParams, t::Int) = site.availability[t]
 
+availablecapacity(site::VariableSiteParams, t::Int) =
+    site.availability[t] * site.capacity_existing
+
+const GeneratorSiteParams = Union{ThermalSiteParams,VariableSiteParams}
+
 struct StorageSiteParams <: StorageSite
 
     name::String
@@ -37,3 +45,6 @@ struct StorageSiteParams <: StorageSite
     energy_new_max::Float64
 
 end
+
+maxpower(site::StorageSiteParams) = site.power_existing
+maxenergy(site::StorageSiteParams) = site.energy_existing

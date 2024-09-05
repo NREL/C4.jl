@@ -4,6 +4,7 @@ abstract type Site end
 StorageSite is an abstract type that can be used to instantiate
 dispatch problems. Instances of StorageSite should define:
 ```
+maxpower(::StorageSite)
 maxenergy(::StorageSite)
 ```
 """
@@ -58,7 +59,11 @@ abstract type Region{
 end
 function name end
 function demand end
+function importinginterfaces end
+function exportinginterfaces end
 
 function cost end
+
+function solve! end
 
 abstract type System{R<:Region, I<:Interface} end

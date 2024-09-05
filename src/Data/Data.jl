@@ -6,10 +6,13 @@ import Base: length
 
 import ..ThermalSite, ..VariableSite, ..StorageSite, ..Technology,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
-       ..Interface, ..Region, ..System, ..cost_generation
+       ..Interface, ..Region, ..System, ..cost_generation,
+       ..maxpower, ..maxenergy, ..availablecapacity,
+       ..demand, ..importinginterfaces, ..exportinginterfaces
 
 # TODO: Rename Period -> DispatchPeriod and TimePeriod -> Period
 export availability, TimePeriod, Period, TimeProxyAssignment,
+       GeneratorParams, GeneratorSiteParams,
        ThermalParams, ThermalSiteParams,
        VariableParams, VariableSiteParams,
        StorageParams, StorageSiteParams,

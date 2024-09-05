@@ -31,10 +31,14 @@ struct RegionParams <: Region{
 end
 
 name(region::RegionParams) = region.name
+demand(region::RegionParams, t::Int) = region.demand[t]
 
 techs(region::RegionParams, ::Type{<:ThermalTechnology}) = region.thermaltechs
 techs(region::RegionParams, ::Type{<:VariableTechnology}) = region.variabletechs
 techs(region::RegionParams, ::Type{<:StorageTechnology}) = region.storagetechs
+
+importinginterfaces(region::RegionParams) = region.import_interfaces
+exportinginterfaces(region::RegionParams) = region.export_interfaces
 
 struct SystemParams <: System{RegionParams,InterfaceParams}
 

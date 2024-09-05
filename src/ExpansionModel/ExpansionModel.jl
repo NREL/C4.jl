@@ -7,7 +7,8 @@ import ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System, ..varnames!,
        ..availablecapacity, ..maxpower, ..maxenergy,
-       ..name, ..cost, ..cost_generation
+       ..name, ..cost, ..cost_generation,
+       ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
 
 using ..Data
 using ..DispatchModel

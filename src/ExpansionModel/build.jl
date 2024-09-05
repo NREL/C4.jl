@@ -301,6 +301,10 @@ struct RegionExpansion <: Region{
 end
 
 name(region::RegionExpansion) = region.params.name
+demand(region::RegionExpansion, t::Int) = demand(region.params, t)
+
+importinginterfaces(region::RegionExpansion) = importinginterfaces(region.params)
+exportinginterfaces(region::RegionExpansion) = exportinginterfaces(region.params)
 
 cost(build::RegionExpansion) =
     sum(cost(thermaltech) for thermaltech in build.thermaltechs; init=0) +

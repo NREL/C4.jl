@@ -26,12 +26,11 @@ struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
             sum(availablecapacity(gen, ts[t]) for gen in region.variabletechs)
             + sum(availablecapacity(gen, ts[t]) for gen in region.thermaltechs)
             + sum(stor.dispatch[t] for stor in storagedispatch)
-            - region.params.demand[ts[t]] # TODO: Abstract demand(region, t)
+            - demand(region, ts[t])
         )
 
-        # TODO: Abstract interfaces in/out
-        import_interfaces = [interfaces[i] for i in region.params.import_interfaces]
-        export_interfaces = [interfaces[i] for i in region.params.export_interfaces]
+        import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
+        export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
         new{R,ST,SS,I}(storagedispatch, surplus_mean,
                        import_interfaces, export_interfaces, region)
@@ -85,6 +84,8 @@ struct ReliabilityDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch
     end
 
 end
+
+cost(dispatch::ReliabilityDispatch) = 0
 
 struct ReliabilityEstimate
 

@@ -14,8 +14,14 @@ end
 num_units(tech::ThermalParams) =
     sum(site.units_existing for site in tech.sites; init=0)
 
+availableunits(tech::ThermalParams, t::Int) =
+    sum(availableunits(site, t) for site in tech.sites; init=0)
+
 nameplatecapacity(tech::ThermalParams) =
     num_units(tech) * tech.unit_size
+
+availablecapacity(tech::ThermalParams, t::Int) =
+    availableunits(tech, t) * tech.unit_size
 
 cost_generation(params::ThermalParams) = params.cost_generation
 
@@ -33,7 +39,12 @@ end
 nameplatecapacity(params::VariableParams) =
     sum(site.capacity_existing for site in params.sites; init=0)
 
+availablecapacity(tech::VariableParams, t::Int) =
+    sum(availablecapacity(site, t) for site in tech.sites; init=0)
+
 cost_generation(params::VariableParams) = params.cost_generation
+
+const GeneratorParams = Union{ThermalParams,VariableParams}
 
 struct StorageParams <: StorageTechnology
 

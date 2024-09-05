@@ -135,6 +135,9 @@ struct DispatchSequence{D <: SystemDispatch}
 
 end
 
+cost(sequence::DispatchSequence) =
+    sum(cost(recurrence) for recurrence in sequence.recurrences; init=0)
+
 function sequence_recurrences(
     m::JuMP.Model, system::System, dispatches::Vector{D}, time::TimeProxyAssignment
 ) where D <: SystemDispatch

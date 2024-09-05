@@ -7,7 +7,7 @@ using C4.ExpansionModel
 using C4.IterationModel
 
 import HiGHS
-import JuMP: optimizer_with_attributes, value
+import JuMP: optimizer_with_attributes, value, termination_status
 
 include("DispatchModel/sequencing.jl")
 include("IterationModel/eue_estimator.jl")
@@ -27,34 +27,57 @@ repeatedchrono = singleperiod(sys, daylength=2)
 eue_estimator = nullestimator(sys, fullchrono)
 max_eues = zeros(3)
 
-@time ram = AdequacyProblem(sys)
-@time adequacy = assess(ram, samples=1000)
+ram = AdequacyProblem(sys)
+adequacy = assess(ram, samples=1000)
 println("NEUE: ", adequacy.region_neue)
 
-@time cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
-@time cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)
+cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
+cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)
 
-@time solve!(cem)
+solve!(cem)
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
 
 sys_built = SystemParams(cem)
 display(sys_built)
 
-@time ram = AdequacyProblem(sys_built)
-@time adequacy = assess(ram, samples=1000)
+ram = AdequacyProblem(sys_built)
+adequacy = assess(ram, samples=1000)
 println("NEUE: ", adequacy.region_neue)
 
+pcm = DispatchProblem(sys_built, ReliabilityDispatch, fullchrono, optimizer)
+solve!(pcm)
+println(termination_status(pcm.model))
+println("Operating Cost (Reliability): ", value(cost(pcm)))
+
+pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
+solve!(pcm)
+println(termination_status(pcm.model))
+println("Operating Cost (Economic): ", value(cost(pcm)))
+
 max_neues = ones(3)
-@time cem, adequacy = iterate_ra_cem(
+cem, adequacy = iterate_ra_cem(
     sys, repeatedchrono, max_neues, optimizer, max_iters=5)
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
 println("NEUE: ", adequacy.region_neue)
 
 neue_tols = fill(0.1, 3)
-@time cem, adequacy = iterate_ra_cem(
+cem, adequacy = iterate_ra_cem(
     sys, repeatedchrono, max_neues, optimizer, neue_tols=neue_tols, max_iters=5)
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
 println("NEUE: ", adequacy.region_neue)
+
+sys_built = SystemParams(cem)
+display(sys_built)
+
+pcm = DispatchProblem(sys_built, ReliabilityDispatch, fullchrono, optimizer)
+solve!(pcm)
+println(termination_status(pcm.model))
+println("Operating Cost (Reliability): ", value(cost(pcm)))
+
+pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
+solve!(pcm)
+println(termination_status(pcm.model))
+println("Operating Cost (Economic): ", value(cost(pcm)))
