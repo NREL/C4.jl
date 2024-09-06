@@ -14,7 +14,6 @@ using ..Data
 using ..DispatchModel
 
 include("build.jl")
-include("dispatch.jl")
 
 export ExpansionProblem, warmstart_builds!, solve!,
        capex, opex, cost, lcoe

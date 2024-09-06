@@ -12,6 +12,9 @@ struct InterfaceParams <: Interface
 
 end
 
+name(iface::InterfaceParams) = iface.name
+availablecapacity(iface::InterfaceParams) = iface.capacity_existing
+
 struct RegionParams <: Region{
     ThermalParams, VariableParams,
     StorageParams, StorageSiteParams, InterfaceParams

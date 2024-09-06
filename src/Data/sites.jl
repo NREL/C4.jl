@@ -48,3 +48,6 @@ end
 
 maxpower(site::StorageSiteParams) = site.power_existing
 maxenergy(site::StorageSiteParams) = site.energy_existing
+
+const SiteParams = Union{GeneratorSiteParams,StorageSiteParams}
+name(site::SiteParams) = site.name

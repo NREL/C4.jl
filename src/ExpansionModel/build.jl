@@ -66,6 +66,8 @@ function warmstart_builds!(build::VariableSiteExpansion, prev_build::VariableSit
     return
 end
 
+const GeneratorSiteExpansion = Union{ThermalSiteExpansion,VariableSiteExpansion}
+
 struct StorageSiteExpansion <: StorageSite
 
     params::StorageSiteParams
@@ -114,6 +116,9 @@ function warmstart_builds!(build::StorageSiteExpansion, prev_build::StorageSiteE
     JuMP.set_start_value(build.energy_new, value(prev_build.energy_new))
     return
 end
+
+const SiteExpansion = Union{GeneratorSiteExpansion,StorageSiteExpansion}
+name(site::SiteExpansion) = name(site.params)
 
 struct ThermalExpansion <: ThermalTechnology
 
@@ -196,7 +201,7 @@ end
 const GeneratorExpansion = Union{ThermalExpansion,VariableExpansion}
 cost_generation(gen::GeneratorExpansion) = gen.params.cost_generation
 
-struct StorageExpansion <: StorageTechnology
+struct StorageExpansion <: StorageTechnology{StorageSiteExpansion}
 
     params::StorageParams
     sites::Vector{StorageSiteExpansion}
@@ -239,6 +244,9 @@ function warmstart_builds!(
     return
 end
 
+const TechnologyExpansion = Union{GeneratorExpansion,StorageExpansion}
+name(tech::TechnologyExpansion) = name(tech.params)
+
 struct InterfaceExpansion <: Interface
 
     params::InterfaceParams
@@ -256,6 +264,8 @@ struct InterfaceExpansion <: Interface
 
 end
 
+name(iface::InterfaceExpansion) = name(iface.params)
+availablecapacity(iface::InterfaceExpansion) = availablecapacity(iface.params) + iface.capacity_new
 cost(build::InterfaceExpansion) = build.capacity_new * build.params.cost_capital
 
 function InterfaceParams(build::InterfaceExpansion)

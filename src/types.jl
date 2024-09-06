@@ -36,7 +36,7 @@ rating_power(::StorageTechnology)
 rating_energy(::StorageTechnology)
 ```
 """
-abstract type StorageTechnology <: Technology end
+abstract type StorageTechnology{SS<:StorageSite} <: Technology end
 function maxenergy end
 function maxpower end
 

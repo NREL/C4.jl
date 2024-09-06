@@ -46,7 +46,7 @@ cost_generation(params::VariableParams) = params.cost_generation
 
 const GeneratorParams = Union{ThermalParams,VariableParams}
 
-struct StorageParams <: StorageTechnology
+struct StorageParams <: StorageTechnology{StorageSiteParams}
 
     name::String
 
@@ -62,3 +62,6 @@ powerrating(tech::StorageParams) =
 
 energyrating(tech::StorageParams) =
     sum(site.energy_existing for site in tech.sites; init=0)
+
+const TechnologyParams = Union{GeneratorParams,StorageParams}
+name(tech::TechnologyParams) = tech.name
