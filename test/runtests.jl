@@ -47,11 +47,19 @@ AdequacyModel.store_adequacy_iteration(con, 0, ram_start => ram_end)
 store(con, ram, adequacy)
 
 cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
-cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)
 
+cem_start = now()
+cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)
 solve!(cem)
+cem_end = now()
+
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
+
+con = DBInterface.connect(DuckDB.DB, timestamp * ".cem.db")
+store(con, cem.system)
+ExpansionModel.store_expansion_iteration(con, 0, cem_start => cem_end)
+store(con, 0, cem.builds)
 
 sys_built = SystemParams(cem)
 display(sys_built)
