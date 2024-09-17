@@ -66,4 +66,6 @@ function cost end
 
 function solve! end
 
+function store end
+
 abstract type System{R<:Region, I<:Interface} end

@@ -4,6 +4,7 @@ authors = ["Gord Stephen <gords@uw.edu>"]
 version = "0.1.0"
 
 [deps]
+DBInterface = "a10d1c49-ce27-4219-8d33-6db1a4562965"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 IterTools = "c8e1da08-722c-5040-9ed9-7db0dc04731e"

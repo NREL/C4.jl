@@ -1,10 +1,15 @@
 using Test
+using Dates
 
 using C4.Data
 using C4.AdequacyModel
 using C4.DispatchModel
 using C4.ExpansionModel
 using C4.IterationModel
+
+import C4.store
+
+using DuckDB
 
 import HiGHS
 import JuMP: optimizer_with_attributes, value, termination_status
@@ -17,9 +22,12 @@ optimizer = optimizer_with_attributes(
     "log_to_console" => false,
 )
 
-
 sys = SystemParams("Data/toysystem")
 display(sys)
+
+timestamp = Dates.format(now(), "yyyymmddHHMMSS")
+con = DBInterface.connect(DuckDB.DB, timestamp * ".params.db")
+store(con, sys)
 
 fullchrono = fullchronologyperiods(sys, daylength=2)
 repeatedchrono = singleperiod(sys, daylength=2)
