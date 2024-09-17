@@ -21,6 +21,17 @@ struct AdequacyResult
     period_eue::Vector{Float64}
     surplus_mean::Matrix{Float64}
     shortfall_samples::Array{Int,3}
+
+    eue::Float64
+    eue_std::Float64
+    lole::Float64
+    lole_std::Float64
+
+    region_eues::Vector{Float64}
+    region_eue_stds::Vector{Float64}
+    region_loles::Vector{Float64}
+    region_lole_stds::Vector{Float64}
+
 end
 
 function AdequacyProblem(sys::SystemParams)
@@ -58,7 +69,11 @@ function assess(prob::AdequacyProblem; samples::Int)
     region_demand = vec(sum(prob.sys.regions.load, dims=2))
     region_neue = region_eue ./ region_demand .* 1_000_000
 
+    lole = LOLE(sf)
+    loles = LOLE.(sf, prob.sys.regions.names)
     eue = EUE(sf)
+    eues = EUE.(sf, prob.sys.regions.names)
+
     neue = val(eue) / sum(region_demand) * 1_000_000
     neue_stderr = stderror(eue) / sum(region_demand) * 1_000_000
 
@@ -87,7 +102,9 @@ function assess(prob::AdequacyProblem; samples::Int)
     shortfall = sfs.shortfall - sps.surplus
 
     return AdequacyResult(neue, neue_stderr, region_neue, period_eue,
-                          surplus_mean, shortfall)
+                          surplus_mean, shortfall,
+                          val(eue), stderror(eue), val(lole), stderror(lole),
+                          val.(eues), stderror.(eues), val.(loles), stderror.(loles))
 
 end
 
@@ -329,5 +346,8 @@ function load_transmission(sys::SystemParams, meta)
     return interfaces, lines, interface_line_idxs
 
 end
+
+include("export.jl")
+
 
 end

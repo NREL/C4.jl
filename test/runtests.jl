@@ -35,9 +35,16 @@ repeatedchrono = singleperiod(sys, daylength=2)
 eue_estimator = nullestimator(sys, fullchrono)
 max_eues = zeros(3)
 
+ram_start = now()
 ram = AdequacyProblem(sys)
 adequacy = assess(ram, samples=1000)
+ram_end = now()
 println("NEUE: ", adequacy.region_neue)
+
+con = DBInterface.connect(DuckDB.DB, timestamp * ".ram.db")
+store(con, sys)
+AdequacyModel.store_adequacy_iteration(con, 0, ram_start => ram_end)
+store(con, ram, adequacy)
 
 cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
 cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)
