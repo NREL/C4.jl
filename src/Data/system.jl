@@ -14,6 +14,8 @@ end
 
 name(iface::InterfaceParams) = iface.name
 availablecapacity(iface::InterfaceParams) = iface.capacity_existing
+region_from(iface::InterfaceParams) = iface.region_from
+region_to(iface::InterfaceParams) = iface.region_to
 
 struct RegionParams <: Region{
     ThermalParams, VariableParams,

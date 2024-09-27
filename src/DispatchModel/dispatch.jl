@@ -30,6 +30,8 @@ end
 cost(dispatch::GeneratorDispatch) =
     sum(dispatch.dispatch) * cost_generation(dispatch.gen)
 
+name(dispatch::GeneratorDispatch) = name(dispatch.gen)
+
 struct StorageSiteDispatch{S<:StorageSite}
 
     dispatch::Vector{JuMP.VariableRef}
@@ -105,6 +107,8 @@ struct StorageDispatch{ST<:StorageTechnology, SS<:StorageSite}
 
 end
 
+name(dispatch::StorageDispatch) = name(dispatch.stor)
+
 struct InterfaceDispatch{I<:Interface}
 
     flow::Vector{JuMP.VariableRef}
@@ -132,6 +136,9 @@ struct InterfaceDispatch{I<:Interface}
 
 end
 
+region_from(iface::InterfaceDispatch) = region_from(iface.iface)
+region_to(iface::InterfaceDispatch) = region_to(iface.iface)
+
 """
 RegionDispatch is an abstract type for holding optimization problem components
 for dispatching a Region. RegionDispatch instance constructors should take the
@@ -142,7 +149,9 @@ RegionDispatch(::JuMP.Model, ::Region, ::Vector{InterfaceDispatch}, ::TimePeriod
 """
 abstract type RegionDispatch{R<:Region} end
 
-# Do we even need this one?
+name(dispatch::RegionDispatch) = name(dispatch.region)
+demand(dispatch::RegionDispatch, t::Int) = demand(dispatch.region, t)
+
 """
 SystemDispatch contains optimization problem components for
 dispatching a System. SystemDispatch constructors should take the

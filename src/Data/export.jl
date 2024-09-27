@@ -128,3 +128,29 @@ function store(con::DBInterface.Connection, iface::InterfaceParams, regions::Vec
     )
 
 end
+
+function store_optimization_iteration(
+    con::DBInterface.Connection, iter::Int, times::Pair{DateTime,DateTime})
+
+    DBInterface.execute(
+        con,
+        "INSERT into iterations (
+            id, optimization_start, optimization_end
+        ) VALUES (?, ?, ?)",
+        (iter, first(times), last(times))
+    )
+
+end
+
+function store_adequacy_iteration(
+    con::DBInterface.Connection, iter::Int, times::Pair{DateTime,DateTime})
+
+    DBInterface.execute(
+        con,
+        "INSERT into iterations (
+            id, adequacy_start, adequacy_end
+        ) VALUES (?, ?, ?)",
+        (iter, first(times), last(times))
+    )
+
+end

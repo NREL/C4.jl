@@ -268,6 +268,9 @@ name(iface::InterfaceExpansion) = name(iface.params)
 availablecapacity(iface::InterfaceExpansion) = availablecapacity(iface.params) + iface.capacity_new
 cost(build::InterfaceExpansion) = build.capacity_new * build.params.cost_capital
 
+region_from(iface::InterfaceExpansion) = region_from(iface.params)
+region_to(iface::InterfaceExpansion) = region_to(iface.params)
+
 function InterfaceParams(build::InterfaceExpansion)
     iface = build.params
     new_capacity = value(build.capacity_new)

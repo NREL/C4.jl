@@ -10,7 +10,7 @@ import ..GeneratorTechnology, ..StorageTechnology, ..StorageSite,
        ..JuMP_ExpressionRef, ..JuMP_LessThanConstraintRef,
        ..JuMP_GreaterThanConstraintRef, ..JuMP_EqualToConstraintRef, ..varnames!,
        ..availablecapacity, ..maxpower, ..maxenergy,
-       ..name, ..cost, ..cost_generation, ..demand,
+       ..name, ..cost, ..cost_generation, ..demand, ..region_from, ..region_to,
        ..importinginterfaces, ..exportinginterfaces, ..solve!
 
 using ..Data
@@ -20,7 +20,6 @@ include("sequencing.jl")
 include("economic.jl")
 include("eue_estimator.jl")
 include("reliability.jl")
-include("export.jl")
 
 export DispatchProblem, EconomicDispatchProblem, ReliabilityDispatchProblem,
        DispatchSequence, EconomicDispatchSequence, ReliabilityDispatchSequence,
@@ -58,12 +57,14 @@ struct DispatchProblem{D<:DispatchSequence}
 
 end
 
-const EconomicDispatchProblem = DispatchProblem{EconomicDispatchSequence}
-const ReliabilityDispatchProblem = DispatchProblem{ReliabilityDispatchSequence}
+const EconomicDispatchProblem = DispatchProblem{<:EconomicDispatchSequence}
+const ReliabilityDispatchProblem = DispatchProblem{<:ReliabilityDispatchSequence}
 
 solve!(prob::DispatchProblem) = JuMP.optimize!(prob.model)
 
 cost(prob::DispatchProblem) =
     8766 / length(prob.system.timesteps) * cost(prob.dispatch)
+
+include("export.jl")
 
 end

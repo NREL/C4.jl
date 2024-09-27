@@ -2,6 +2,17 @@ using DBInterface
 using Dates
 
 import ..store
+import ..Data: store_optimization_iteration
+
+function store(
+    con::DBInterface.Connection, pcm::EconomicDispatchProblem,
+    timings::Pair{DateTime,DateTime}; iter::Int=0)
+
+    store(con, pcm.system)
+    store_optimization_iteration(con, iter, timings)
+    store(con, iter, pcm.dispatch)
+
+end
 
 function store(con::DBInterface.Connection, iter::Int, seq::EconomicDispatchSequence)
 
@@ -81,14 +92,12 @@ function store(
     con::DBInterface.Connection, iter::Int, period::TimePeriod,
     region::RegionEconomicDispatch)
 
-    regionparams = region.region
-
     for (i, t) in enumerate(period.timesteps)
 
         DBInterface.execute(con, "INSERT into demands (
                 iteration, period, timestep, region, load
             ) VALUES (?, ?, ?, ?, ?)",
-            (iter, period.name, i, regionparams.name, regionparams.demand[t])
+            (iter, period.name, i, name(region), demand(region, t))
         )
 
         for gen in region.thermaltechs
@@ -98,7 +107,7 @@ function store(
             DBInterface.execute(con, "INSERT into dispatches (
                     iteration, period, timestep, tech, region, dispatch
                 ) VALUES (?, ?, ?, ?, ?, ?)",
-                (iter, period.name, i, gen.gen.name, regionparams.name, dispatch)
+                (iter, period.name, i, name(gen), name(region), dispatch)
             )
 
         end
@@ -110,7 +119,7 @@ function store(
             DBInterface.execute(con, "INSERT into dispatches (
                     iteration, period, timestep, tech, region, dispatch
                 ) VALUES (?, ?, ?, ?, ?, ?)",
-                (iter, period.name, i, gen.gen.name, regionparams.name, dispatch)
+                (iter, period.name, i, name(gen), name(region), dispatch)
             )
 
         end
@@ -123,7 +132,7 @@ function store(
             DBInterface.execute(con, "INSERT into dispatches (
                     iteration, period, timestep, tech, region, dispatch
                 ) VALUES (?, ?, ?, ?, ?, ?)",
-                (iter, period.name, i, stor.stor.name, regionparams.name, dispatch)
+                (iter, period.name, i, name(stor), name(region), dispatch)
             )
 
         end
@@ -136,8 +145,8 @@ function store(
     con::DBInterface.Connection, iter::Int, period::TimePeriod,
     interface::InterfaceDispatch, regions::Vector{<:RegionEconomicDispatch})
 
-    region_from = regions[interface.iface.region_from].region.name
-    region_to = regions[interface.iface.region_to].region.name
+    r_from = name(regions[region_from(interface)])
+    r_to = name(regions[region_to(interface)])
 
     for (i, t) in enumerate(period.timesteps)
 
@@ -146,7 +155,7 @@ function store(
         DBInterface.execute(con, "INSERT into flows (
                 iteration, period, timestep, region_from, region_to, flow
             ) VALUES (?, ?, ?, ?, ?, ?)",
-            (iter, period.name, i, region_from, region_to, flow)
+            (iter, period.name, i, r_from, r_to, flow)
         )
 
     end

@@ -44,6 +44,8 @@ abstract type ThermalTechnology <: GeneratorTechnology end
 abstract type VariableTechnology <: GeneratorTechnology end
 
 abstract type Interface end
+function region_from end
+function region_to end
 
 """
 Region is an abstract type that can be used to instantiate

@@ -42,7 +42,7 @@ ram_end = now()
 println("NEUE: ", ram.region_neue)
 
 con = DBInterface.connect(DuckDB.DB, timestamp * ".ram.db")
-store(con, 0, ram, ram_start => ram_end)
+store(con, ram, ram_start => ram_end)
 
 cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
 
@@ -55,9 +55,7 @@ println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
 
 con = DBInterface.connect(DuckDB.DB, timestamp * ".cem.db")
-store(con, cem.system)
-ExpansionModel.store_expansion_iteration(con, 0, cem_start => cem_end)
-store(con, 0, cem.builds)
+store(con, cem, cem_start => cem_end)
 
 sys_built = SystemParams(cem)
 display(sys_built)
@@ -79,9 +77,7 @@ println(termination_status(pcm.model))
 println("Operating Cost (Economic): ", value(cost(pcm)))
 
 con = DBInterface.connect(DuckDB.DB, timestamp * ".pcm.db")
-store(con, pcm.system)
-ExpansionModel.store_expansion_iteration(con, 0, pcm_start => pcm_end)
-store(con, 0, pcm.dispatch)
+store(con, pcm, pcm_start => pcm_end)
 
 max_neues = ones(3)
 cem, ram = iterate_ra_cem(

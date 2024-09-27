@@ -2,6 +2,18 @@ using DBInterface
 using Dates
 
 import ..store
+import ..Data: store_optimization_iteration
+
+function store(
+    con::DBInterface.Connection, cem::ExpansionProblem,
+    timings::Pair{DateTime,DateTime}; iter::Int=0)
+
+    store(con, cem.system)
+    store_optimization_iteration(con, iter, timings)
+    store(con, iter, cem.builds)
+    store(con, iter, cem.economicdispatch)
+
+end
 
 function store(con::DBInterface.Connection, iter::Int, sys::SystemExpansion)
 
@@ -56,7 +68,7 @@ function store(con::DBInterface.Connection, iter::Int, site::ThermalSiteExpansio
         "INSERT into sitebuilds (
             iteration, site, tech, region, power
         ) VALUES (?, ?, ?, ?, ?)",
-        (iter, site.params.name, tech.params.name, region.params.name, total_capacity)
+        (iter, name(site), name(tech), name(region), total_capacity)
     )
 
 end
@@ -71,7 +83,7 @@ function store(con::DBInterface.Connection, iter::Int, site::VariableSiteExpansi
         "INSERT into sitebuilds (
             iteration, site, tech, region, power
         ) VALUES (?, ?, ?, ?, ?)",
-        (iter, site.params.name, tech.params.name, region.params.name, total_capacity)
+        (iter, name(site), name(tech), name(region), total_capacity)
     )
 
 end
@@ -79,15 +91,15 @@ end
 function store(con::DBInterface.Connection, iter::Int, site::StorageSiteExpansion,
                tech::StorageExpansion, region::RegionExpansion)
 
-    total_power = value(site.power_new) + site.params.power_existing
-    total_energy = value(site.energy_new) + site.params.energy_existing
+    total_power = value(maxpower(site))
+    total_energy = value(maxenergy(site))
 
     DBInterface.execute(
         con,
         "INSERT into sitebuilds (
             iteration, site, tech, region, power, energy
         ) VALUES (?, ?, ?, ?, ?, ?)",
-        (iter, site.params.name, tech.params.name, region.params.name, total_power, total_energy)
+        (iter, name(site), name(tech), name(region), total_power, total_energy)
     )
 
 end
@@ -95,10 +107,10 @@ end
 function store(con::DBInterface.Connection, iter::Int,
                iface::InterfaceExpansion, regions::Vector{RegionExpansion})
 
-    region_from = regions[iface.params.region_from].params.name
-    region_to = regions[iface.params.region_to].params.name
+    region_from = name(regions[iface.params.region_from])
+    region_to = name(regions[iface.params.region_to])
 
-    total_capacity = value(iface.capacity_new) + iface.params.capacity_existing
+    total_capacity = value(availablecapacity(iface))
 
     DBInterface.execute(
         con,
@@ -106,19 +118,6 @@ function store(con::DBInterface.Connection, iter::Int,
             iteration, region_from, region_to, capacity
         ) VALUES (?, ?, ?, ?)",
         (iter, region_from, region_to, total_capacity)
-    )
-
-end
-
-function store_expansion_iteration(
-    con::DBInterface.Connection, iter::Int, times::Pair{DateTime,DateTime})
-
-    DBInterface.execute(
-        con,
-        "INSERT into iterations (
-            id, optimization_start, optimization_end
-        ) VALUES (?, ?, ?)",
-        (iter, first(times), last(times))
     )
 
 end

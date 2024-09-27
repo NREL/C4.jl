@@ -1,10 +1,11 @@
 using DBInterface
 
 import ..store
+import ..Data: store_adequacy_iteration
 
 function store(
-    con::DBInterface.Connection, iter::Int, result::AdequacyProblem,
-    timings::Pair{DateTime,DateTime})
+    con::DBInterface.Connection, result::AdequacyProblem,
+    timings::Pair{DateTime,DateTime}; iter::Int=0)
 
     store(con, result.sys)
     store_adequacy_iteration(con, iter, timings)
@@ -49,18 +50,5 @@ function store(
         )
 
     end
-
-end
-
-function store_adequacy_iteration(
-    con::DBInterface.Connection, iter::Int, times::Pair{DateTime,DateTime})
-
-    DBInterface.execute(
-        con,
-        "INSERT into iterations (
-            id, adequacy_start, adequacy_end
-        ) VALUES (?, ?, ?)",
-        (iter, first(times), last(times))
-    )
 
 end

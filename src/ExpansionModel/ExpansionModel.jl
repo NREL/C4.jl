@@ -7,14 +7,13 @@ import ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System, ..varnames!,
        ..availablecapacity, ..maxpower, ..maxenergy,
-       ..name, ..cost, ..cost_generation,
+       ..name, ..cost, ..cost_generation, ..region_from, ..region_to,
        ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
 
 using ..Data
 using ..DispatchModel
 
 include("build.jl")
-include("export.jl")
 
 export ExpansionProblem, warmstart_builds!, solve!,
        capex, opex, cost, lcoe
@@ -112,5 +111,7 @@ function warmstart_builds!(prob::ExpansionProblem, prev_prob::ExpansionProblem)
     warmstart_builds!.(prob.builds.interfaces, prev_prob.builds.interfaces)
     return
 end
+
+include("export.jl")
 
 end
