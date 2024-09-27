@@ -29,7 +29,7 @@ mutable struct IterationProgress
 
 end
 
-function update!(results::IterationProgress, adequacy::AdequacyResult)
+function update!(results::IterationProgress, adequacy::AdequacyProblem)
     push!(results.times, time() - results.t_start)
     push!(results.capex, NaN)
     push!(results.opex, NaN)
@@ -38,7 +38,7 @@ function update!(results::IterationProgress, adequacy::AdequacyResult)
     return
 end
 
-function update!(results::IterationProgress, cem::ExpansionProblem, adequacy::AdequacyResult)
+function update!(results::IterationProgress, cem::ExpansionProblem, adequacy::AdequacyProblem)
     push!(results.times, time() - results.t_start)
     push!(results.capex, value(capex(cem)))
     push!(results.opex, value(opex(cem)))
@@ -86,13 +86,13 @@ function iterate_ra_cem(
 
     progress = IterationProgress()
 
-    ram = AdequacyProblem(sys)
-    adequacy = assess(ram, samples=nsamples)
-    update!(progress, adequacy)
-    println(adequacy.region_neue)
+    ram = AdequacyProblem(sys, samples=nsamples)
+    solve!(ram)
+    update!(progress, ram)
+    println(ram.region_neue)
 
     eue_estimator = bootstrap_estimator(
-        sys, economic_chronology, adequacy, eue_tols,
+        sys, economic_chronology, ram, eue_tols,
         aspp=aspp, endog_risk=endog_risk)
 
     cem = nothing
@@ -113,14 +113,14 @@ function iterate_ra_cem(
 
         solve!(cem)
 
-        ram = AdequacyProblem(SystemParams(cem))
-        adequacy = assess(ram, samples=nsamples)
-        println(adequacy.neue, "\t", adequacy.region_neue, "\n")
+        ram = AdequacyProblem(SystemParams(cem), samples=nsamples)
+        solve!(ram)
+        println(ram.neue, "\t", ram.region_neue, "\n")
 
-        update!(progress, cem, adequacy)
-        is_adequate = all(adequacy.region_neue .<= max_neues)
+        update!(progress, cem, ram)
+        is_adequate = all(ram.region_neue .<= max_neues)
 
-        eue_estimator = update_estimator(cem, adequacy, eue_estimator, eue_tols,
+        eue_estimator = update_estimator(cem, ram, eue_estimator, eue_tols,
                                          aspp=aspp, endog_risk=endog_risk)
 
         prev_cem = cem
@@ -129,12 +129,12 @@ function iterate_ra_cem(
 
     end
 
-    return cem, adequacy, progress
+    return cem, ram, progress
 
 end
 
 function bootstrap_estimator(
-    sys::SystemParams, time::TimeProxyAssignment, adequacy::AdequacyResult,
+    sys::SystemParams, time::TimeProxyAssignment, adequacy::AdequacyProblem,
     eue_tols::Vector{Float64}; aspp::Bool, endog_risk::Bool
 )
 
@@ -154,7 +154,7 @@ function bootstrap_estimator(
 end
 
 function update_estimator(
-    cem::ExpansionProblem, adequacy::AdequacyResult,
+    cem::ExpansionProblem, adequacy::AdequacyProblem,
     old_estimator::EUEEstimator, eue_tols::Vector{Float64};
     aspp::Bool, endog_risk::Bool
 )
@@ -178,7 +178,7 @@ function update_estimator(
 end
 
 function add_stressperiod(
-    sys::SystemParams, times::TimeProxyAssignment, adequacy::AdequacyResult
+    sys::SystemParams, times::TimeProxyAssignment, adequacy::AdequacyProblem
 )
 
     days = reshape(adequacy.period_eue, times.daylength, :)
@@ -214,7 +214,7 @@ end
 already_included(hour::Int, periods::Vector{TimePeriod}) =
     any(p -> in(hour, p.timesteps), periods)
 
-function estimators(adequacy::AdequacyResult, tpa::TimeProxyAssignment)
+function estimators(adequacy::AdequacyProblem, tpa::TimeProxyAssignment)
 
     return [
         period_estimator(adequacy.shortfall_samples, adequacy.surplus_mean, tpa, p)
@@ -224,7 +224,7 @@ function estimators(adequacy::AdequacyResult, tpa::TimeProxyAssignment)
 end
 
 function estimators(
-    cem::ExpansionProblem, adequacy::AdequacyResult, tpa::TimeProxyAssignment)
+    cem::ExpansionProblem, adequacy::AdequacyProblem, tpa::TimeProxyAssignment)
 
     dispatch_periods = [d.period for d in cem.reliabilitydispatch.dispatches]
 

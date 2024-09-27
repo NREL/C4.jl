@@ -1,9 +1,13 @@
 using DBInterface
+
 import ..store
 
 function store(
-    con::DBInterface.Connection, ram::AdequacyProblem, result::AdequacyResult,
-    iteration::Int=0)
+    con::DBInterface.Connection, iter::Int, result::AdequacyProblem,
+    timings::Pair{DateTime,DateTime})
+
+    store(con, result.sys)
+    store_adequacy_iteration(con, iter, timings)
 
     DBInterface.execute(con, "CREATE TABLE IF NOT EXISTS adequacies (
         iteration INTEGER PRIMARY KEY REFERENCES iterations(id),
@@ -25,13 +29,13 @@ function store(
         PRIMARY KEY (iteration, region)
     )")
 
-    region_names = ram.sys.regions.names
-    region_demands = vec(sum(ram.sys.regions.load, dims=2))
+    region_names = result.prassys.regions.names
+    region_demands = vec(sum(result.prassys.regions.load, dims=2))
 
     DBInterface.execute(con, "INSERT into adequacies (
             iteration, demand, eue, eue_std, lole, lole_std
         ) VALUES (?, ?, ?, ?, ?, ?)",
-        (iteration, sum(region_demands), result.eue, result.eue_std, result.lole, result.lole_std)
+        (iter, sum(region_demands), result.eue, result.eue_std, result.lole, result.lole_std)
     )
 
     for r in 1:length(region_names)
@@ -39,7 +43,7 @@ function store(
         DBInterface.execute(con, "INSERT into region_adequacies (
                 iteration, region, demand, eue, eue_std, lole, lole_std
             ) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (iteration, region_names[r], region_demands[r],
+            (iter, region_names[r], region_demands[r],
              result.region_eues[r], result.region_eue_stds[r],
              result.region_loles[r], result.region_lole_stds[r])
         )

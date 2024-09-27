@@ -7,14 +7,16 @@ using TimeZones
 import PRAS: assess
 
 using ..Data
+import ..solve!
 
-export AdequacyProblem, AdequacyResult, assess
+export AdequacyProblem
 
-struct AdequacyProblem
-    sys::SystemModel
-end
+mutable struct AdequacyProblem
 
-struct AdequacyResult
+    sys::SystemParams
+    prassys::SystemModel
+    samples::Int
+
     neue::Float64
     neue_stderr::Float64
     region_neue::Vector{Float64}
@@ -32,79 +34,90 @@ struct AdequacyResult
     region_loles::Vector{Float64}
     region_lole_stds::Vector{Float64}
 
+    function AdequacyProblem(sys::SystemParams; samples::Int)
+
+        n_periods = length(sys.timesteps)
+        meta = (N=n_periods, L=1, T=Hour, P=MW, E=MWh)
+
+        regions = load_regions(sys, meta)
+        n_regions = length(regions)
+
+        generators, region_gen_idxs = load_generators(sys, meta)
+        storages, region_stor_idxs = load_storages(sys, meta)
+        generatorstorages, region_genstor_idxs = load_generatorstorages(sys, meta)
+
+        interfaces, lines, interface_line_idxs = load_transmission(sys, meta)
+
+        prassys = SystemModel(
+            regions, interfaces, generators, region_gen_idxs,
+            storages, region_stor_idxs, generatorstorages, region_genstor_idxs,
+            lines, interface_line_idxs, sys.timesteps)
+
+        return new(sys, prassys, samples)
+
+    end
+
 end
 
-function AdequacyProblem(sys::SystemParams)
 
-    meta = (N=length(sys.timesteps), L=1, T=Hour, P=MW, E=MWh)
+function solve!(prob::AdequacyProblem)
 
-    regions = load_regions(sys, meta)
+    simspec = SequentialMonteCarlo(samples=prob.samples, seed=1)
 
-    generators, region_gen_idxs = load_generators(sys, meta)
-    storages, region_stor_idxs = load_storages(sys, meta)
-    generatorstorages, region_genstor_idxs = load_generatorstorages(sys, meta)
-
-    interfaces, lines, interface_line_idxs = load_transmission(sys, meta)
-
-    prassys = SystemModel(
-        regions, interfaces, generators, region_gen_idxs,
-        storages, region_stor_idxs, generatorstorages, region_genstor_idxs,
-        lines, interface_line_idxs, sys.timesteps)
-
-    return AdequacyProblem(prassys)
-
-end
-
-function assess(prob::AdequacyProblem; samples::Int)
-
-    simspec = SequentialMonteCarlo(samples=samples, seed=1)
-
-    sf, sfs, sps, fl, se = assess(prob.sys, simspec,
+    sf, sfs, sps, fl, se = assess(prob.prassys, simspec,
         Shortfall(), ShortfallSamples(), SurplusSamples(),
         Flow(), StorageEnergy())
 
-    period_eue = vec(sum(sf.shortfall_mean, dims=1))
-    region_eue = vec(sum(sf.shortfall_mean, dims=2))
+    prob.period_eue = vec(sum(sf.shortfall_mean, dims=1))
+    prob.region_eues = vec(sum(sf.shortfall_mean, dims=2))
 
-    region_demand = vec(sum(prob.sys.regions.load, dims=2))
-    region_neue = region_eue ./ region_demand .* 1_000_000
+    region_demand = vec(sum(prob.prassys.regions.load, dims=2))
+    prob.region_neue = prob.region_eues ./ region_demand .* 1_000_000
+
+    eue = EUE(sf)
+    prob.eue = val(eue)
+    prob.eue_std = stderror(eue)
 
     lole = LOLE(sf)
-    loles = LOLE.(sf, prob.sys.regions.names)
-    eue = EUE(sf)
-    eues = EUE.(sf, prob.sys.regions.names)
+    prob.lole = val(lole)
+    prob.lole_std = stderror(lole)
 
-    neue = val(eue) / sum(region_demand) * 1_000_000
-    neue_stderr = stderror(eue) / sum(region_demand) * 1_000_000
+    eues = EUE.(sf, prob.prassys.regions.names)
+    prob.region_eues = val.(eues)
+    prob.region_eue_stds = stderror.(eues)
 
-    R = length(prob.sys.regions)
-    T = length(prob.sys.timestamps)
+    loles = LOLE.(sf, prob.prassys.regions.names)
+    prob.region_loles = val.(loles)
+    prob.region_lole_stds = stderror.(loles)
 
-    ucap = prob.sys.generators.capacity .*
-        prob.sys.generators.μ ./ (prob.sys.generators.λ .+ prob.sys.generators.μ)
+    prob.neue = val(eue) / sum(region_demand) * 1_000_000
+    prob.neue_stderr = stderror(eue) / sum(region_demand) * 1_000_000
 
-    region_ucap = aggregate(ucap, prob.sys.region_gen_idxs)
+    R = length(prob.prassys.regions)
+    T = length(prob.prassys.timestamps)
+
+    ucap = prob.prassys.generators.capacity .*
+        prob.prassys.generators.μ ./ (prob.prassys.generators.λ .+ prob.prassys.generators.μ)
+
+    region_ucap = aggregate(ucap, prob.prassys.region_gen_idxs)
 
     region_net_import = zeros(Float64, R, T)
     for (i, (from, to)) in enumerate(zip(
-            prob.sys.interfaces.regions_from, prob.sys.interfaces.regions_to))
+            prob.prassys.interfaces.regions_from, prob.prassys.interfaces.regions_to))
         region_net_import[from, :] .-= fl.flow_mean[i, :]
         region_net_import[to, :] .+= fl.flow_mean[i, :]
     end
 
     n_stors = length(se.storages)
     net_stor_discharge = -diff([zeros(n_stors) se.energy_mean], dims=2)
-    region_net_stor_discharge = aggregate(net_stor_discharge, prob.sys.region_stor_idxs)
+    region_net_stor_discharge = aggregate(net_stor_discharge, prob.prassys.region_stor_idxs)
 
-    surplus_mean = region_ucap .+ region_net_import .+
-        region_net_stor_discharge .- prob.sys.regions.load
+    prob.surplus_mean = region_ucap .+ region_net_import .+
+        region_net_stor_discharge .- prob.prassys.regions.load
 
-    shortfall = sfs.shortfall - sps.surplus
+    prob.shortfall_samples = sfs.shortfall - sps.surplus
 
-    return AdequacyResult(neue, neue_stderr, region_neue, period_eue,
-                          surplus_mean, shortfall,
-                          val(eue), stderror(eue), val(lole), stderror(lole),
-                          val.(eues), stderror.(eues), val.(loles), stderror.(loles))
+    return
 
 end
 

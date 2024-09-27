@@ -36,15 +36,13 @@ eue_estimator = nullestimator(sys, fullchrono)
 max_eues = zeros(3)
 
 ram_start = now()
-ram = AdequacyProblem(sys)
-adequacy = assess(ram, samples=1000)
+ram = AdequacyProblem(sys, samples=1000)
+solve!(ram)
 ram_end = now()
-println("NEUE: ", adequacy.region_neue)
+println("NEUE: ", ram.region_neue)
 
 con = DBInterface.connect(DuckDB.DB, timestamp * ".ram.db")
-store(con, sys)
-AdequacyModel.store_adequacy_iteration(con, 0, ram_start => ram_end)
-store(con, ram, adequacy)
+store(con, 0, ram, ram_start => ram_end)
 
 cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
 
@@ -64,9 +62,9 @@ store(con, 0, cem.builds)
 sys_built = SystemParams(cem)
 display(sys_built)
 
-ram = AdequacyProblem(sys_built)
-adequacy = assess(ram, samples=1000)
-println("NEUE: ", adequacy.region_neue)
+ram = AdequacyProblem(sys_built, samples=1000)
+solve!(ram)
+println("NEUE: ", ram.region_neue)
 
 pcm = DispatchProblem(sys_built, ReliabilityDispatch, fullchrono, optimizer)
 solve!(pcm)
@@ -86,18 +84,18 @@ ExpansionModel.store_expansion_iteration(con, 0, pcm_start => pcm_end)
 store(con, 0, pcm.dispatch)
 
 max_neues = ones(3)
-cem, adequacy = iterate_ra_cem(
+cem, ram = iterate_ra_cem(
     sys, repeatedchrono, max_neues, optimizer, max_iters=5)
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
-println("NEUE: ", adequacy.region_neue)
+println("NEUE: ", ram.region_neue)
 
 neue_tols = fill(0.1, 3)
-cem, adequacy = iterate_ra_cem(
+cem, ram = iterate_ra_cem(
     sys, repeatedchrono, max_neues, optimizer, neue_tols=neue_tols, max_iters=5)
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
-println("NEUE: ", adequacy.region_neue)
+println("NEUE: ", ram.region_neue)
 
 sys_built = SystemParams(cem)
 display(sys_built)
