@@ -20,10 +20,12 @@ include("sequencing.jl")
 include("economic.jl")
 include("eue_estimator.jl")
 include("reliability.jl")
+include("export.jl")
 
-export DispatchProblem, DispatchSequence, EconomicDispatch,
-       ReliabilityDispatch, ReliabilityConstraints,
-       EUEEstimator, PeriodEUEEstimator, nullestimator
+export DispatchProblem, EconomicDispatchProblem, ReliabilityDispatchProblem,
+       DispatchSequence, EconomicDispatchSequence, ReliabilityDispatchSequence,
+       EconomicDispatch, ReliabilityDispatch,
+       ReliabilityConstraints, EUEEstimator, PeriodEUEEstimator, nullestimator
 
 struct DispatchProblem{D<:DispatchSequence}
 
@@ -55,6 +57,9 @@ struct DispatchProblem{D<:DispatchSequence}
     end
 
 end
+
+const EconomicDispatchProblem = DispatchProblem{EconomicDispatchSequence}
+const ReliabilityDispatchProblem = DispatchProblem{ReliabilityDispatchSequence}
 
 solve!(prob::DispatchProblem) = JuMP.optimize!(prob.model)
 

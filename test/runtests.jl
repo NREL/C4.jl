@@ -73,10 +73,17 @@ solve!(pcm)
 println(termination_status(pcm.model))
 println("Operating Cost (Reliability): ", value(cost(pcm)))
 
+pcm_start = now()
 pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
 solve!(pcm)
+pcm_end = now()
 println(termination_status(pcm.model))
 println("Operating Cost (Economic): ", value(cost(pcm)))
+
+con = DBInterface.connect(DuckDB.DB, timestamp * ".pcm.db")
+store(con, pcm.system)
+ExpansionModel.store_expansion_iteration(con, 0, pcm_start => pcm_end)
+store(con, 0, pcm.dispatch)
 
 max_neues = ones(3)
 cem, adequacy = iterate_ra_cem(

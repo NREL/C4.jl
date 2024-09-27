@@ -85,6 +85,8 @@ struct ReliabilityDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch
 
 end
 
+const ReliabilityDispatchSequence = DispatchSequence{<:ReliabilityDispatch}
+
 cost(dispatch::ReliabilityDispatch) = 0
 
 struct ReliabilityEstimate

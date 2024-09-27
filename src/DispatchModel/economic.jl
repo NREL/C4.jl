@@ -91,5 +91,7 @@ struct EconomicDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch{S}
 
 end
 
+const EconomicDispatchSequence = DispatchSequence{<:EconomicDispatch}
+
 cost(dispatch::EconomicDispatch) =
     sum(cost(region) for region in dispatch.regions; init=0)
