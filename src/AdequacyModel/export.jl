@@ -9,6 +9,11 @@ function store(
 
     store(con, result.sys)
     store_adequacy_iteration(con, iter, timings)
+    store(con, iter, result)
+
+end
+
+function store(con::DBInterface.Connection, iter::Int, result::AdequacyProblem)
 
     DBInterface.execute(con, "CREATE TABLE IF NOT EXISTS adequacies (
         iteration INTEGER PRIMARY KEY REFERENCES iterations(id),

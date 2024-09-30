@@ -1,5 +1,5 @@
 using DBInterface
-using Dates
+import Dates: DateTime
 
 import ..store
 import ..Data: store_optimization_iteration

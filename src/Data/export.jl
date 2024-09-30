@@ -154,3 +154,17 @@ function store_adequacy_iteration(
     )
 
 end
+
+function store_full_iteration(
+    con::DBInterface.Connection, iter::Int,
+    opt_times::Pair{DateTime,DateTime}, adq_times::Pair{DateTime,DateTime})
+
+    DBInterface.execute(
+        con,
+        "INSERT into iterations (
+            id, optimization_start, optimization_end, adequacy_start, adequacy_end
+        ) VALUES (?, ?, ?, ?, ?)",
+        (iter, first(opt_times), last(opt_times), first(adq_times), last(adq_times))
+    )
+
+end

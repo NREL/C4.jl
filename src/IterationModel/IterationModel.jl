@@ -5,8 +5,12 @@ using C4.AdequacyModel
 using C4.DispatchModel
 using C4.ExpansionModel
 
+import ..store
+
+import Dates: Date, now
+import DBInterface
 import DelimitedFiles: writedlm
-import Dates: Date
+import DuckDB
 import JuMP: value
 
 export iterate_ra_cem, saveprogress
@@ -63,8 +67,10 @@ function iterate_ra_cem(
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
     min_iters::Int=0, max_iters::Int=999, timeout::Float64=Inf,
-    aspp::Bool=true, endog_risk::Bool=true)
+    aspp::Bool=true, endog_risk::Bool=true, outfile::String="",
+    check_dispatch::Bool=false)
 
+    persist = length(outfile) > 0
     max_neue = maximum(max_neues)
     timeout += time()
 
@@ -86,8 +92,18 @@ function iterate_ra_cem(
 
     progress = IterationProgress()
 
+    ram_start = now()
     ram = AdequacyProblem(sys, samples=nsamples)
     solve!(ram)
+    ram_end = now()
+
+    if persist
+        con = DBInterface.connect(DuckDB.DB, outfile)
+        store(con, sys)
+        store_adequacy_iteration(con, 0, ram_start => ram_end)
+        store(con, 0, ram)
+    end
+
     update!(progress, ram)
     println(ram.region_neue)
 
@@ -96,12 +112,14 @@ function iterate_ra_cem(
         aspp=aspp, endog_risk=endog_risk)
 
     cem = nothing
+    sys_built = nothing
     prev_cem = nothing
     n_iters = 0
 
     while (time() < timeout) && (n_iters < max_iters)
 
         n_iters += 1
+        cem_start = now()
 
         cem = ExpansionProblem(sys, economic_chronology, eue_estimator, max_eues, optimizer)
         isnothing(prev_cem) || warmstart_builds!(cem, prev_cem)
@@ -112,9 +130,20 @@ function iterate_ra_cem(
         end
 
         solve!(cem)
+        cem_end = now()
 
-        ram = AdequacyProblem(SystemParams(cem), samples=nsamples)
+        ram_start = now()
+        sys_built = SystemParams(cem)
+        ram = AdequacyProblem(sys_built, samples=nsamples)
         solve!(ram)
+        ram_end = now()
+
+        if persist
+            store_full_iteration(con, n_iters, cem_start => cem_end, ram_start => ram_end)
+            store(con, n_iters, cem.builds)
+            store(con, n_iters, cem.economicdispatch)
+            store(con, n_iters, ram)
+        end
         println(ram.neue, "\t", ram.region_neue, "\n")
 
         update!(progress, cem, ram)
@@ -129,7 +158,25 @@ function iterate_ra_cem(
 
     end
 
-    return cem, ram, progress
+    pcm = nothing
+
+    if check_dispatch
+
+        pcm_start = now()
+        n_iters += 1
+        fullchrono = fullchronologyperiods(sys_built, daylength=economic_chronology.daylength)
+        pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
+        solve!(pcm)
+        pcm_end = now()
+
+        if persist
+            store_optimization_iteration(con, n_iters, pcm_start => pcm_end)
+            store(con, n_iters, pcm.dispatch)
+        end
+
+    end
+
+    return cem, ram, pcm, progress
 
 end
 
