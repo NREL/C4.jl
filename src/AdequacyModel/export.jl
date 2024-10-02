@@ -1,14 +1,14 @@
 using DBInterface
 
 import ..store
-import ..Data: store_adequacy_iteration
 
 function store(
     con::DBInterface.Connection, result::AdequacyProblem,
     timings::Pair{DateTime,DateTime}; iter::Int=0)
 
     store(con, result.sys)
-    store_adequacy_iteration(con, iter, timings)
+    store_iteration(con, iter)
+    store_iteration_step(con, iter, "adequacy", timings)
     store(con, iter, result)
 
 end

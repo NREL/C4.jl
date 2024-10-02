@@ -20,8 +20,7 @@ export availability, TimePeriod, Period, TimeProxyAssignment,
        timestepcount,
        singleperiod, seasonalperiods, monthlyperiods,
        weeklyperiods, dailyperiods, fullchronologyperiods,
-       store_adequacy_iteration, store_optimization_iteration,
-       store_full_iteration
+       store_iteration, store_iteration_step
 
 include("time.jl")
 include("sites.jl")

@@ -2,14 +2,14 @@ using DBInterface
 import Dates: DateTime
 
 import ..store
-import ..Data: store_optimization_iteration
 
 function store(
     con::DBInterface.Connection, pcm::EconomicDispatchProblem,
     timings::Pair{DateTime,DateTime}; iter::Int=0)
 
     store(con, pcm.system)
-    store_optimization_iteration(con, iter, timings)
+    store_iteration(con, iter)
+    store_iteration_step(con, iter, "dispatch", timings)
     store(con, iter, pcm.dispatch)
 
 end

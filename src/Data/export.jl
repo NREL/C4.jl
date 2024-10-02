@@ -46,11 +46,15 @@ function store(con::DBInterface.Connection, sys::SystemParams)
     foreach(iface -> store(con, iface, sys.regions), sys.interfaces)
 
     DBInterface.execute(con, "CREATE TABLE iterations (
-        id INTEGER PRIMARY KEY,
-        optimization_start TIMESTAMP,
-        optimization_end TIMESTAMP,
-        adequacy_start TIMESTAMP,
-        adequacy_end TIMESTAMP
+        id INTEGER PRIMARY KEY
+    )")
+
+    DBInterface.execute(con, "CREATE TABLE iteration_steps (
+        iteration INTEGER REFERENCES iterations(id),
+        step TEXT,
+        t_start TIMESTAMP,
+        t_end TIMESTAMP,
+        PRIMARY KEY (iteration, step),
     )")
 
 end
@@ -129,42 +133,20 @@ function store(con::DBInterface.Connection, iface::InterfaceParams, regions::Vec
 
 end
 
-function store_optimization_iteration(
-    con::DBInterface.Connection, iter::Int, times::Pair{DateTime,DateTime})
-
-    DBInterface.execute(
-        con,
-        "INSERT into iterations (
-            id, optimization_start, optimization_end
-        ) VALUES (?, ?, ?)",
-        (iter, first(times), last(times))
-    )
-
+function store_iteration(con::DBInterface.Connection, iter::Int)
+    DBInterface.execute(con, "INSERT into iterations (id) VALUES (?)", (iter,))
 end
 
-function store_adequacy_iteration(
-    con::DBInterface.Connection, iter::Int, times::Pair{DateTime,DateTime})
+function store_iteration_step(
+    con::DBInterface.Connection, iter::Int, step::String,
+    times::Pair{DateTime,DateTime})
 
     DBInterface.execute(
         con,
-        "INSERT into iterations (
-            id, adequacy_start, adequacy_end
-        ) VALUES (?, ?, ?)",
-        (iter, first(times), last(times))
-    )
-
-end
-
-function store_full_iteration(
-    con::DBInterface.Connection, iter::Int,
-    opt_times::Pair{DateTime,DateTime}, adq_times::Pair{DateTime,DateTime})
-
-    DBInterface.execute(
-        con,
-        "INSERT into iterations (
-            id, optimization_start, optimization_end, adequacy_start, adequacy_end
-        ) VALUES (?, ?, ?, ?, ?)",
-        (iter, first(opt_times), last(opt_times), first(adq_times), last(adq_times))
+        "INSERT into iteration_steps (
+            iteration, step, t_start, t_end
+        ) VALUES (?, ?, ?, ?)",
+        (iter, step, first(times), last(times))
     )
 
 end

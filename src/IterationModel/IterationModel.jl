@@ -100,7 +100,8 @@ function iterate_ra_cem(
     if persist
         con = DBInterface.connect(DuckDB.DB, outfile)
         store(con, sys)
-        store_adequacy_iteration(con, 0, ram_start => ram_end)
+        store_iteration(con, 0)
+        store_iteration_step(con, 0, "adequacy", ram_start => ram_end)
         store(con, 0, ram)
     end
 
@@ -139,7 +140,9 @@ function iterate_ra_cem(
         ram_end = now()
 
         if persist
-            store_full_iteration(con, n_iters, cem_start => cem_end, ram_start => ram_end)
+            store_iteration(con, n_iters)
+            store_iteration_step(con, n_iters, "expansion", cem_start => cem_end)
+            store_iteration_step(con, n_iters, "adequacy", ram_start => ram_end)
             store(con, n_iters, cem.builds)
             store(con, n_iters, cem.economicdispatch)
             store(con, n_iters, ram)
@@ -170,7 +173,8 @@ function iterate_ra_cem(
         pcm_end = now()
 
         if persist
-            store_optimization_iteration(con, n_iters, pcm_start => pcm_end)
+            store_iteration(con, n_iters)
+            store_iteration_step(con, n_iters, "dispatch", pcm_start => pcm_end)
             store(con, n_iters, pcm.dispatch)
         end
 

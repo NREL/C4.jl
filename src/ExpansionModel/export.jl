@@ -2,14 +2,14 @@ using DBInterface
 using Dates
 
 import ..store
-import ..Data: store_optimization_iteration
 
 function store(
     con::DBInterface.Connection, cem::ExpansionProblem,
     timings::Pair{DateTime,DateTime}; iter::Int=0)
 
     store(con, cem.system)
-    store_optimization_iteration(con, iter, timings)
+    store_iteration(con, iter)
+    store_iteration_step(con, iter, "expansion", timings)
     store(con, iter, cem.builds)
     store(con, iter, cem.economicdispatch)
 
