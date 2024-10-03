@@ -59,6 +59,21 @@ function store(con::DBInterface.Connection, iter::Int, seq::EconomicDispatchSequ
         PRIMARY KEY (iteration, period, timestep, region_from, region_to)
     )")
 
+
+    DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_generation AS
+        SELECT iteration, period, tech, region, sum(dispatch) as generation from dispatches group by iteration, period, tech, region
+    ")
+
+    DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_generation_scaled AS
+        SELECT iteration, period, tech, region, generation*reps as generation
+        FROM summary_generation JOIN periods USING (iteration, period);
+    ")
+
+    DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_opex AS
+        SELECT iteration, period, tech, region, cost_generation * generation AS opex
+        FROM summary_generation_scaled JOIN techs USING (tech, region);
+    ")
+
     store(con, iter, seq.time)
     foreach(dispatch -> store(con, iter, dispatch), seq.dispatches)
 

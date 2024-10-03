@@ -97,20 +97,27 @@ function iterate_ra_cem(
     solve!(ram)
     ram_end = now()
 
+
+    update!(progress, ram)
+    println(ram.region_neue)
+
+    curves_start = now()
+    eue_estimator = bootstrap_estimator(
+        sys, economic_chronology, ram, eue_tols,
+        aspp=aspp, endog_risk=endog_risk)
+    curves_end = now()
+
     if persist
+        store_start = now()
         con = DBInterface.connect(DuckDB.DB, outfile)
         store(con, sys)
         store_iteration(con, 0)
         store_iteration_step(con, 0, "adequacy", ram_start => ram_end)
         store(con, 0, ram)
+        store_iteration_step(con, 0, "riskcurves", curves_start => curves_end)
+        store_end = now()
+        store_iteration_step(con, 0, "persistence", store_start => store_end)
     end
-
-    update!(progress, ram)
-    println(ram.region_neue)
-
-    eue_estimator = bootstrap_estimator(
-        sys, economic_chronology, ram, eue_tols,
-        aspp=aspp, endog_risk=endog_risk)
 
     cem = nothing
     sys_built = nothing
@@ -139,21 +146,28 @@ function iterate_ra_cem(
         solve!(ram)
         ram_end = now()
 
-        if persist
-            store_iteration(con, n_iters)
-            store_iteration_step(con, n_iters, "expansion", cem_start => cem_end)
-            store_iteration_step(con, n_iters, "adequacy", ram_start => ram_end)
-            store(con, n_iters, cem.builds)
-            store(con, n_iters, cem.economicdispatch)
-            store(con, n_iters, ram)
-        end
         println(ram.neue, "\t", ram.region_neue, "\n")
 
         update!(progress, cem, ram)
         is_adequate = all(ram.region_neue .<= max_neues)
 
+        curves_start = now()
         eue_estimator = update_estimator(cem, ram, eue_estimator, eue_tols,
                                          aspp=aspp, endog_risk=endog_risk)
+        curves_end = now()
+
+        if persist
+            store_start = now()
+            store_iteration(con, n_iters)
+            store_iteration_step(con, n_iters, "expansion", cem_start => cem_end)
+            store_iteration_step(con, n_iters, "adequacy", ram_start => ram_end)
+            store_iteration_step(con, n_iters, "riskcurves", curves_start => curves_end)
+            store(con, n_iters, cem.builds)
+            store(con, n_iters, cem.economicdispatch)
+            store(con, n_iters, ram)
+            store_end = now()
+            store_iteration_step(con, n_iters, "persistence", store_start => store_end)
+        end
 
         prev_cem = cem
 

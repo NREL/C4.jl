@@ -37,6 +37,12 @@ function store(con::DBInterface.Connection, iter::Int, sys::SystemExpansion)
         PRIMARY KEY (iteration, region_from, region_to)
     )")
 
+    # TODO: Transmission expansion costs
+    DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_capex AS
+        SELECT iteration, site, tech, region, power * cost_capital_power as cost_power, energy * cost_capital_energy as cost_energy
+        FROM sitebuilds JOIN techs USING (tech, region)
+    ")
+
     foreach(region -> store(con, iter, region), sys.regions)
     foreach(iface -> store(con, iter, iface, sys.regions), sys.interfaces)
 
