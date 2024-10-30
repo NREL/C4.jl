@@ -1,7 +1,33 @@
-using DBInterface
+import DBInterface
+import DuckDB
+
 import ..store
 
-function store(con::DBInterface.Connection, sys::SystemParams)
+struct DataAppender
+
+    regions::DuckDB.Appender
+    techs::DuckDB.Appender
+    sites::DuckDB.Appender
+    interfaces::DuckDB.Appender
+
+    DataAppender(con::DuckDB.DB) = new(
+        DuckDB.Appender(con, "regions"),
+        DuckDB.Appender(con, "techs"),
+        DuckDB.Appender(con, "sites"),
+        DuckDB.Appender(con, "interfaces")
+    )
+
+end
+
+function DuckDB.close(appender::DataAppender)
+    DuckDB.close(appender.regions)
+    DuckDB.close(appender.techs)
+    DuckDB.close(appender.sites)
+    DuckDB.close(appender.interfaces)
+    return
+end
+
+function store(con::DuckDB.DB, sys::SystemParams)
 
     DBInterface.execute(con, "CREATE TABLE regions (
         region TEXT PRIMARY KEY
@@ -34,8 +60,6 @@ function store(con::DBInterface.Connection, sys::SystemParams)
         PRIMARY KEY (site, tech, region)
     )")
 
-    foreach(region -> store(con, region), sys.regions)
-
     DBInterface.execute(con, "CREATE TABLE interfaces (
         region_from TEXT REFERENCES regions(region),
         region_to TEXT REFERENCES regions(region),
@@ -43,7 +67,12 @@ function store(con::DBInterface.Connection, sys::SystemParams)
         PRIMARY KEY (region_from, region_to),
     )")
 
-    foreach(iface -> store(con, iface, sys.regions), sys.interfaces)
+    appender = DataAppender(con)
+
+    foreach(region -> store(appender, region), sys.regions)
+    foreach(iface -> store(appender, iface, sys.regions), sys.interfaces)
+
+    DuckDB.close(appender)
 
     DBInterface.execute(con, "CREATE TABLE iterations (
         id INTEGER PRIMARY KEY
@@ -57,88 +86,80 @@ function store(con::DBInterface.Connection, sys::SystemParams)
         PRIMARY KEY (iteration, step),
     )")
 
+    return
+
 end
 
-function store(con::DBInterface.Connection, region::RegionParams)
+function store(appender::DataAppender, region::RegionParams)
 
-    DBInterface.execute(
-        con,
-        "INSERT into regions (region) VALUES (?)",
-        (region.name,)
-    )
+    DuckDB.append(appender.regions, region.name)
+    DuckDB.end_row(appender.regions)
 
-    foreach(tech -> store(con, tech, region), region.thermaltechs)
-    foreach(tech -> store(con, tech, region), region.variabletechs)
-    foreach(tech -> store(con, tech, region), region.storagetechs)
+    foreach(tech -> store(appender, tech, region), region.thermaltechs)
+    foreach(tech -> store(appender, tech, region), region.variabletechs)
+    foreach(tech -> store(appender, tech, region), region.storagetechs)
 
 end
 
 techtype(::ThermalParams) = "thermal"
 techtype(::VariableParams) = "variable"
 
-function store(con::DBInterface.Connection, gen::GeneratorParams, region::RegionParams)
+function store(appender::DataAppender, gen::GeneratorParams, region::RegionParams)
 
-    DBInterface.execute(
-        con,
-        "INSERT into techs (
-            tech, region, techtype, cost_generation, cost_capital_power
-        ) VALUES (?, ?, ?, ?, ?)",
-        (gen.name, region.name, techtype(gen), gen.cost_generation, gen.cost_capital)
-    )
+    DuckDB.append(appender.techs, gen.name)
+    DuckDB.append(appender.techs, region.name)
+    DuckDB.append(appender.techs, techtype(gen))
+    DuckDB.append(appender.techs, gen.cost_generation)
+    DuckDB.append(appender.techs, gen.cost_capital)
+    DuckDB.append(appender.techs, nothing)
+    DuckDB.end_row(appender.techs)
 
-    foreach(site -> store(con, site, gen, region), gen.sites)
-
-end
-
-function store(con::DBInterface.Connection, stor::StorageParams, region::RegionParams)
-
-    DBInterface.execute(
-        con,
-        "INSERT into techs (
-            tech, region, techtype,
-            cost_capital_power, cost_capital_energy
-        ) VALUES (?, ?, 'storage', ?, ?)",
-        (stor.name, region.name, stor.cost_capital_power, stor.cost_capital_energy)
-    )
-
-    foreach(site -> store(con, site, stor, region), stor.sites)
+    foreach(site -> store(appender, site, gen, region), gen.sites)
 
 end
 
-function store(con::DBInterface.Connection, site::SiteParams,
+function store(appender::DataAppender, stor::StorageParams, region::RegionParams)
+
+    DuckDB.append(appender.techs, stor.name)
+    DuckDB.append(appender.techs, region.name)
+    DuckDB.append(appender.techs, "storage")
+    DuckDB.append(appender.techs, nothing)
+    DuckDB.append(appender.techs, stor.cost_capital_power)
+    DuckDB.append(appender.techs, stor.cost_capital_energy)
+    DuckDB.end_row(appender.techs)
+
+    foreach(site -> store(appender, site, stor, region), stor.sites)
+
+end
+
+function store(appender::DataAppender, site::SiteParams,
                tech::TechnologyParams, region::RegionParams)
 
-    DBInterface.execute(
-        con,
-        "INSERT into sites (
-            site, tech, region
-        ) VALUES (?, ?, ?)",
-        (site.name, tech.name, region.name)
-    )
+    DuckDB.append(appender.sites, site.name)
+    DuckDB.append(appender.sites, tech.name)
+    DuckDB.append(appender.sites, region.name)
+    DuckDB.end_row(appender.sites)
 
 end
 
-function store(con::DBInterface.Connection, iface::InterfaceParams, regions::Vector{RegionParams})
+function store(appender::DataAppender, iface::InterfaceParams, regions::Vector{RegionParams})
 
     region_from = regions[iface.region_from].name
     region_to = regions[iface.region_to].name
 
-    DBInterface.execute(
-        con,
-        "INSERT into interfaces (
-            region_from, region_to, cost_capital
-        ) VALUES (?, ?, ?)",
-        (region_from, region_to, iface.cost_capital)
-    )
+    DuckDB.append(appender.interfaces, region_from)
+    DuckDB.append(appender.interfaces, region_to)
+    DuckDB.append(appender.interfaces, iface.cost_capital)
+    DuckDB.end_row(appender.interfaces)
 
 end
 
-function store_iteration(con::DBInterface.Connection, iter::Int)
+function store_iteration(con::DuckDB.DB, iter::Int)
     DBInterface.execute(con, "INSERT into iterations (id) VALUES (?)", (iter,))
 end
 
 function store_iteration_step(
-    con::DBInterface.Connection, iter::Int, step::String,
+    con::DuckDB.DB, iter::Int, step::String,
     times::Pair{DateTime,DateTime})
 
     DBInterface.execute(
