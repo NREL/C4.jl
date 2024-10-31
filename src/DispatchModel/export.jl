@@ -1,4 +1,5 @@
-using DBInterface
+import DBInterface
+import DuckDB
 import Dates: DateTime
 
 import ..store
@@ -12,6 +13,30 @@ function store(
     store_iteration_step(con, iter, "dispatch", timings)
     store(con, iter, pcm.dispatch)
 
+end
+
+struct DispatchAppender
+
+    periods::DuckDB.Appender
+    demands::DuckDB.Appender
+    dispatches::DuckDB.Appender
+    flows::DuckDB.Appender
+
+    DispatchAppender(con::DuckDB.DB) = new(
+        DuckDB.Appender(con, "periods"),
+        DuckDB.Appender(con, "demands"),
+        DuckDB.Appender(con, "dispatches"),
+        DuckDB.Appender(con, "flows")
+    )
+
+end
+
+function DuckDB.close(appender::DispatchAppender)
+    DuckDB.close(appender.periods)
+    DuckDB.close(appender.demands)
+    DuckDB.close(appender.dispatches)
+    DuckDB.close(appender.flows)
+    return
 end
 
 function store(con::DBInterface.Connection, iter::Int, seq::EconomicDispatchSequence)
@@ -59,6 +84,12 @@ function store(con::DBInterface.Connection, iter::Int, seq::EconomicDispatchSequ
         PRIMARY KEY (iteration, period, timestep, region_from, region_to)
     )")
 
+    appender = DispatchAppender(con)
+
+    store(appender, iter, seq.time)
+    foreach(dispatch -> store(appender, iter, dispatch), seq.dispatches)
+
+    DuckDB.close(appender)
 
     DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_generation AS
         SELECT iteration, period, tech, region, sum(dispatch) as generation from dispatches group by iteration, period, tech, region
@@ -74,56 +105,59 @@ function store(con::DBInterface.Connection, iter::Int, seq::EconomicDispatchSequ
         FROM summary_generation_scaled JOIN techs USING (tech, region);
     ")
 
-    store(con, iter, seq.time)
-    foreach(dispatch -> store(con, iter, dispatch), seq.dispatches)
-
 end
 
-function store(con::DBInterface.Connection, iter::Int, time::TimeProxyAssignment)
+function store(appender::DispatchAppender, iter::Int, time::TimeProxyAssignment)
     reps = zeros(Int, length(time.periods))
     foreach(p_idx -> reps[p_idx] += 1, time.days)
-    foreach((p, n) -> store(con, iter, p, n), time.periods, reps)
+    foreach((p, n) -> store(appender, iter, p, n), time.periods, reps)
 end
 
-function store(con::DBInterface.Connection, iter::Int, period::TimePeriod, reps::Int)
-    DBInterface.execute(con, "INSERT into periods (
-            iteration, period, reps, t_start, t_end
-        ) VALUES (?, ?, ?, ?, ?)",
-        (iter, period.name, reps, first(period.timesteps), last(period.timesteps))
-    )
+function store(appender::DispatchAppender, iter::Int, period::TimePeriod, reps::Int)
+
+    DuckDB.append(appender.periods, iter)
+    DuckDB.append(appender.periods, period.name)
+    DuckDB.append(appender.periods, reps)
+    DuckDB.append(appender.periods, first(period.timesteps))
+    DuckDB.append(appender.periods, last(period.timesteps))
+    DuckDB.end_row(appender.periods)
+
 end
 
-function store(con::DBInterface.Connection, iter::Int, dispatch::EconomicDispatch)
+function store(appender::DispatchAppender, iter::Int, dispatch::EconomicDispatch)
 
-    foreach(region -> store(con, iter, dispatch.period, region), dispatch.regions)
+    foreach(region -> store(appender, iter, dispatch.period, region), dispatch.regions)
 
     foreach(interface ->
-                store(con, iter, dispatch.period, interface, dispatch.regions),
+                store(appender, iter, dispatch.period, interface, dispatch.regions),
             dispatch.interfaces)
 
 end
 
 function store(
-    con::DBInterface.Connection, iter::Int, period::TimePeriod,
+    appender::DispatchAppender, iter::Int, period::TimePeriod,
     region::RegionEconomicDispatch)
 
     for (i, t) in enumerate(period.timesteps)
 
-        DBInterface.execute(con, "INSERT into demands (
-                iteration, period, timestep, region, load
-            ) VALUES (?, ?, ?, ?, ?)",
-            (iter, period.name, i, name(region), demand(region, t))
-        )
+        DuckDB.append(appender.demands, iter)
+        DuckDB.append(appender.demands, period.name)
+        DuckDB.append(appender.demands, i)
+        DuckDB.append(appender.demands, name(region))
+        DuckDB.append(appender.demands, demand(region, t))
+        DuckDB.end_row(appender.demands)
 
         for gen in region.thermaltechs
 
             dispatch = value(gen.dispatch[i])
 
-            DBInterface.execute(con, "INSERT into dispatches (
-                    iteration, period, timestep, tech, region, dispatch
-                ) VALUES (?, ?, ?, ?, ?, ?)",
-                (iter, period.name, i, name(gen), name(region), dispatch)
-            )
+            DuckDB.append(appender.dispatches, iter)
+            DuckDB.append(appender.dispatches, period.name)
+            DuckDB.append(appender.dispatches, i)
+            DuckDB.append(appender.dispatches, name(gen))
+            DuckDB.append(appender.dispatches, name(region))
+            DuckDB.append(appender.dispatches, dispatch)
+            DuckDB.end_row(appender.dispatches)
 
         end
 
@@ -131,11 +165,13 @@ function store(
 
             dispatch = value(gen.dispatch[i])
 
-            DBInterface.execute(con, "INSERT into dispatches (
-                    iteration, period, timestep, tech, region, dispatch
-                ) VALUES (?, ?, ?, ?, ?, ?)",
-                (iter, period.name, i, name(gen), name(region), dispatch)
-            )
+            DuckDB.append(appender.dispatches, iter)
+            DuckDB.append(appender.dispatches, period.name)
+            DuckDB.append(appender.dispatches, i)
+            DuckDB.append(appender.dispatches, name(gen))
+            DuckDB.append(appender.dispatches, name(region))
+            DuckDB.append(appender.dispatches, dispatch)
+            DuckDB.end_row(appender.dispatches)
 
         end
 
@@ -144,11 +180,13 @@ function store(
 
             dispatch = value(stor.dispatch[i])
 
-            DBInterface.execute(con, "INSERT into dispatches (
-                    iteration, period, timestep, tech, region, dispatch
-                ) VALUES (?, ?, ?, ?, ?, ?)",
-                (iter, period.name, i, name(stor), name(region), dispatch)
-            )
+            DuckDB.append(appender.dispatches, iter)
+            DuckDB.append(appender.dispatches, period.name)
+            DuckDB.append(appender.dispatches, i)
+            DuckDB.append(appender.dispatches, name(stor))
+            DuckDB.append(appender.dispatches, name(region))
+            DuckDB.append(appender.dispatches, dispatch)
+            DuckDB.end_row(appender.dispatches)
 
         end
 
@@ -157,7 +195,7 @@ function store(
 end
 
 function store(
-    con::DBInterface.Connection, iter::Int, period::TimePeriod,
+    appender::DispatchAppender, iter::Int, period::TimePeriod,
     interface::InterfaceDispatch, regions::Vector{<:RegionEconomicDispatch})
 
     r_from = name(regions[region_from(interface)])
@@ -167,11 +205,13 @@ function store(
 
         flow = value(interface.flow[i])
 
-        DBInterface.execute(con, "INSERT into flows (
-                iteration, period, timestep, region_from, region_to, flow
-            ) VALUES (?, ?, ?, ?, ?, ?)",
-            (iter, period.name, i, r_from, r_to, flow)
-        )
+        DuckDB.append(appender.flows, iter)
+        DuckDB.append(appender.flows, period.name)
+        DuckDB.append(appender.flows, i)
+        DuckDB.append(appender.flows, r_from)
+        DuckDB.append(appender.flows, r_to)
+        DuckDB.append(appender.flows, flow)
+        DuckDB.end_row(appender.flows)
 
     end
 
