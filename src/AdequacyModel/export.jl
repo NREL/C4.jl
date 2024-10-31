@@ -1,4 +1,5 @@
-using DBInterface
+import DBInterface
+import DuckDB
 
 import ..store
 
@@ -11,6 +12,24 @@ function store(
     store_iteration_step(con, iter, "adequacy", timings)
     store(con, iter, result)
 
+end
+
+struct AdequacyAppender
+
+    adequacies::DuckDB.Appender
+    region_adequacies::DuckDB.Appender
+
+    AdequacyAppender(con::DuckDB.DB) = new(
+        DuckDB.Appender(con, "adequacies"),
+        DuckDB.Appender(con, "region_adequacies"),
+    )
+
+end
+
+function DuckDB.close(appender::AdequacyAppender)
+    DuckDB.close(appender.adequacies)
+    DuckDB.close(appender.region_adequacies)
+    return
 end
 
 function store(con::DBInterface.Connection, iter::Int, result::AdequacyProblem)
@@ -35,25 +54,34 @@ function store(con::DBInterface.Connection, iter::Int, result::AdequacyProblem)
         PRIMARY KEY (iteration, region)
     )")
 
+    appender = AdequacyAppender(con)
+
     region_names = result.prassys.regions.names
     region_demands = vec(sum(result.prassys.regions.load, dims=2))
 
-    DBInterface.execute(con, "INSERT into adequacies (
-            iteration, demand, eue, eue_std, lole, lole_std
-        ) VALUES (?, ?, ?, ?, ?, ?)",
-        (iter, sum(region_demands), result.eue, result.eue_std, result.lole, result.lole_std)
-    )
+    DuckDB.append(appender.adequacies, iter)
+    DuckDB.append(appender.adequacies, sum(region_demands))
+    DuckDB.append(appender.adequacies, result.eue)
+    DuckDB.append(appender.adequacies, result.eue_std)
+    DuckDB.append(appender.adequacies, result.lole)
+    DuckDB.append(appender.adequacies, result.lole_std)
+    DuckDB.end_row(appender.adequacies)
 
     for r in 1:length(region_names)
 
-        DBInterface.execute(con, "INSERT into region_adequacies (
-                iteration, region, demand, eue, eue_std, lole, lole_std
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (iter, region_names[r], region_demands[r],
-             result.region_eues[r], result.region_eue_stds[r],
-             result.region_loles[r], result.region_lole_stds[r])
-        )
+        DuckDB.append(appender.region_adequacies, iter)
+        DuckDB.append(appender.region_adequacies, region_names[r])
+        DuckDB.append(appender.region_adequacies, region_demands[r])
+        DuckDB.append(appender.region_adequacies, result.region_eues[r])
+        DuckDB.append(appender.region_adequacies, result.region_eue_stds[r])
+        DuckDB.append(appender.region_adequacies, result.region_loles[r])
+        DuckDB.append(appender.region_adequacies, result.region_lole_stds[r])
+        DuckDB.end_row(appender.region_adequacies)
 
     end
+
+    DuckDB.close(appender)
+
+    return
 
 end
