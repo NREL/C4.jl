@@ -13,60 +13,15 @@ import DelimitedFiles: writedlm
 import DuckDB
 import JuMP: value
 
-export iterate_ra_cem, saveprogress
+export iterate_ra_cem
 
 include("eue_estimator_compression.jl")
-
-mutable struct IterationProgress
-
-    t_start::Float64
-
-    times::Vector{Float64}
-    capex::Vector{Float64}
-    opex::Vector{Float64}
-    neue::Vector{Float64}
-    neue_stderr::Vector{Float64}
-
-    function IterationProgress()
-        new(time(), Float64[], Float64[], Float64[], Float64[], Float64[])
-    end
-
-end
-
-function update!(results::IterationProgress, adequacy::AdequacyProblem)
-    push!(results.times, time() - results.t_start)
-    push!(results.capex, NaN)
-    push!(results.opex, NaN)
-    push!(results.neue, adequacy.neue)
-    push!(results.neue_stderr, adequacy.neue_stderr)
-    return
-end
-
-function update!(results::IterationProgress, cem::ExpansionProblem, adequacy::AdequacyProblem)
-    push!(results.times, time() - results.t_start)
-    push!(results.capex, value(capex(cem)))
-    push!(results.opex, value(opex(cem)))
-    push!(results.neue, adequacy.neue)
-    push!(results.neue_stderr, adequacy.neue_stderr)
-    return
-end
-
-function Base.show(io::IO, results::IterationProgress)
-    display([results.times results.capex results.opex results.neue])
-end
-
-function saveprogress(filename::String, results::IterationProgress)
-    result = ["time" "capex" "opex" "neue" "neue_stder";
-              results.times results.capex results.opex results.neue results.neue_stderr]
-    writedlm(filename, result, ',')
-    return
-end
 
 function iterate_ra_cem(
     sys::SystemParams, economic_chronology::TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
-    min_iters::Int=0, max_iters::Int=999, timeout::Float64=Inf,
+    timeout::Float64=Inf,
     aspp::Bool=true, endog_risk::Bool=true, outfile::String="",
     check_dispatch::Bool=false)
 
@@ -90,15 +45,11 @@ function iterate_ra_cem(
         eue_tols = zeros(length(sys.regions))
     end
 
-    progress = IterationProgress()
-
     ram_start = now()
     ram = AdequacyProblem(sys, samples=nsamples)
     solve!(ram)
     ram_end = now()
 
-
-    update!(progress, ram)
     println(ram.region_neue)
 
     curves_start = now()
@@ -124,7 +75,7 @@ function iterate_ra_cem(
     prev_cem = nothing
     n_iters = 0
 
-    while (time() < timeout) && (n_iters < max_iters)
+    while (time() < timeout)
 
         n_iters += 1
         cem_start = now()
@@ -148,7 +99,6 @@ function iterate_ra_cem(
 
         println(ram.neue, "\t", ram.region_neue, "\n")
 
-        update!(progress, cem, ram)
         is_adequate = all(ram.region_neue .<= max_neues)
 
         curves_start = now()
@@ -171,13 +121,14 @@ function iterate_ra_cem(
 
         prev_cem = cem
 
+        is_adequate && break
         aspp || endog_risk || break
 
     end
 
     pcm = nothing
 
-    if check_dispatch
+    if (aspp || endog_risk) && check_dispatch
 
         pcm_start = now()
         n_iters += 1
@@ -194,7 +145,7 @@ function iterate_ra_cem(
 
     end
 
-    return cem, ram, pcm, progress
+    return cem, ram, pcm
 
 end
 
@@ -295,6 +246,9 @@ function estimators(
 
     result = similar(tpa.periods, PeriodEUEEstimator)
 
+    min_slope = Inf
+    max_slope = -Inf
+
     for (p, period) in enumerate(tpa.periods)
 
         dispatch_idx = findfirst(isequal(period), dispatch_periods)
@@ -309,7 +263,15 @@ function estimators(
         result[p] =
             period_estimator(adequacy.shortfall_samples, surplus_mean, tpa, p)
 
+        for v in result[p].slopes
+            low, hi = extrema(v)
+            low < min_slope && (min_slope = low)
+            hi > max_slope && (max_slope = hi)
+        end
+
     end
+
+    @show (min_slope, max_slope)
 
     return result
 

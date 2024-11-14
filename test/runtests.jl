@@ -69,17 +69,10 @@ println(termination_status(pcm.model))
 println("Operating Cost (Economic): ", value(cost(pcm)))
 
 max_neues = ones(3)
-cem, ram, pcm, progress = iterate_ra_cem(
-    sys, repeatedchrono, max_neues, optimizer, max_iters=5)
-println("System Cost: ", value(cost(cem)))
-println("System LCOE: ", value(lcoe(cem)))
-println("NEUE: ", ram.region_neue)
-
 neue_tols = fill(0.1, 3)
-cem, ram, pcm, progress = iterate_ra_cem(
-    sys, repeatedchrono, max_neues, optimizer,
-    neue_tols=neue_tols, max_iters=5,
-    outfile=timestamp * ".db", check_dispatch=true)
+cem, ram, pcm = iterate_ra_cem(
+    sys, fullchrono, max_neues, optimizer,
+    neue_tols=neue_tols, outfile=timestamp * ".db", check_dispatch=true)
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
 println("NEUE: ", ram.region_neue)
