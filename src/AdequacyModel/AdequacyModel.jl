@@ -22,7 +22,7 @@ mutable struct AdequacyProblem
     region_neue::Vector{Float64}
     period_eue::Vector{Float64}
     surplus_mean::Matrix{Float64}
-    shortfall_samples::Array{Int,3}
+    shortfall_samples::Array{Float64,3}
 
     eue::Float64
     eue_std::Float64

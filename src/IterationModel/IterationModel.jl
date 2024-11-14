@@ -316,7 +316,7 @@ function estimators(
 end
 
 function period_estimator(
-    surplus_steps::Array{Int,3}, surplus_mean::Matrix{Float64},
+    surplus_steps::Array{Float64,3}, surplus_mean::Matrix{Float64},
     tpa::TimeProxyAssignment, period_idx::Int)
 
     R, T_fullchrono, n_samples = size(surplus_steps)
@@ -337,16 +337,14 @@ function period_estimator(
 
     for r in 1:R, t_period in 1:T_period
 
-        steps = Int[]
+        steps = Float64[]
 
         for day in period_days
 
             t = (day-1) * T_period + t_period
-
             t_idx = const_means ? t_period : t
-            surplus_rt = round(Int, surplus_mean[r, t_idx])
 
-            append!(steps, surplus_steps[r, t, :] .+ surplus_rt)
+            append!(steps, surplus_steps[r, t, :] .+ surplus_mean[r, t_idx])
 
         end
 
@@ -359,7 +357,7 @@ function period_estimator(
 
 end
 
-function estimator_params(steps::Vector{Int}, n_samples::Int)
+function estimator_params(steps::Vector{Float64}, n_samples::Int)
 
     n_steps = length(steps)
 
