@@ -7,7 +7,7 @@ using TimeZones
 import PRAS: assess
 
 using ..Data
-import ..solve!
+import ..solve!, ..powerunits_MW
 
 export AdequacyProblem
 
@@ -75,16 +75,16 @@ function solve!(prob::AdequacyProblem)
     prob.region_neue = prob.region_eues ./ region_demand .* 1_000_000
 
     eue = EUE(sf)
-    prob.eue = val(eue)
-    prob.eue_std = stderror(eue)
+    prob.eue = val(eue) / powerunits_MW
+    prob.eue_std = stderror(eue) / powerunits_MW
 
     lole = LOLE(sf)
     prob.lole = val(lole)
     prob.lole_std = stderror(lole)
 
     eues = EUE.(sf, prob.prassys.regions.names)
-    prob.region_eues = val.(eues)
-    prob.region_eue_stds = stderror.(eues)
+    prob.region_eues = val.(eues) / powerunits_MW
+    prob.region_eue_stds = stderror.(eues) / powerunits_MW
 
     loles = LOLE.(sf, prob.prassys.regions.names)
     prob.region_loles = val.(loles)
@@ -96,7 +96,7 @@ function solve!(prob::AdequacyProblem)
     R = length(prob.prassys.regions)
     T = length(prob.prassys.timestamps)
 
-    ucap = prob.prassys.generators.capacity .*
+    ucap = prob.prassys.generators.capacity ./ powerunits_MW .*
         prob.prassys.generators.μ ./ (prob.prassys.generators.λ .+ prob.prassys.generators.μ)
 
     region_ucap = aggregate(ucap, prob.prassys.region_gen_idxs)
@@ -104,18 +104,18 @@ function solve!(prob::AdequacyProblem)
     region_net_import = zeros(Float64, R, T)
     for (i, (from, to)) in enumerate(zip(
             prob.prassys.interfaces.regions_from, prob.prassys.interfaces.regions_to))
-        region_net_import[from, :] .-= fl.flow_mean[i, :]
-        region_net_import[to, :] .+= fl.flow_mean[i, :]
+        region_net_import[from, :] .-= fl.flow_mean[i, :] ./ powerunits_MW
+        region_net_import[to, :] .+= fl.flow_mean[i, :] ./ powerunits_MW
     end
 
     n_stors = length(se.storages)
-    net_stor_discharge = -diff([zeros(n_stors) se.energy_mean], dims=2)
+    net_stor_discharge = -diff([zeros(n_stors) se.energy_mean], dims=2) ./ powerunits_MW
     region_net_stor_discharge = aggregate(net_stor_discharge, prob.prassys.region_stor_idxs)
 
     prob.surplus_mean = region_ucap .+ region_net_import .+
-        region_net_stor_discharge .- prob.prassys.regions.load
+        region_net_stor_discharge .- prob.prassys.regions.load ./ powerunits_MW
 
-    prob.shortfall_samples = sfs.shortfall - sps.surplus
+    prob.shortfall_samples = (sfs.shortfall - sps.surplus) ./ powerunits_MW
 
     return
 
@@ -139,7 +139,7 @@ function load_regions(sys::SystemParams, meta)
     load = zeros(Int, length(sys.regions), meta.N)
 
     for (r, region) in enumerate(sys.regions)
-        load[r, :] = round.(Int, region.demand)
+        load[r, :] = round.(Int, region.demand .* powerunits_MW)
     end
 
     return Regions{meta.N, meta.P}(names, load)
@@ -172,7 +172,7 @@ function load_generators(sys::SystemParams, meta)
                     g_last += 1
                     names[g_last] = sitename * "_$i"
                     categories[g_last] = tech.name
-                    capacity[g_last, :] .= tech.unit_size
+                    capacity[g_last, :] .= round.(Int, tech.unit_size .* powerunits_MW)
                     lambda[g_last, :] .= site.λ
                     mu[g_last, :] .= site.μ
                 end
@@ -190,7 +190,7 @@ function load_generators(sys::SystemParams, meta)
             for tech in region.variabletechs
                 for site in tech.sites
                     capacity[g_last, :] .+=
-                        round.(Int, site.capacity_existing .* site.availability)
+                        round.(Int, site.capacity_existing .* powerunits_MW .* site.availability)
                 end
             end
 
@@ -271,8 +271,8 @@ function load_storages(sys::SystemParams, meta)
                     s_last += 1
                     names[s_last] = sitename
                     categories[s_last] = tech.name
-                    power_capacity[s_last, :] .= round(Int, site.power_existing)
-                    energy_capacity[s_last, :] .= round(Int, site.energy_existing)
+                    power_capacity[s_last, :] .= round(Int, site.power_existing .* powerunits_MW)
+                    energy_capacity[s_last, :] .= round(Int, site.energy_existing .* powerunits_MW)
                 end
             end
         end
@@ -340,7 +340,7 @@ function load_transmission(sys::SystemParams, meta)
         region_from = sys.regions[iface.region_from]
         region_to = sys.regions[iface.region_to]
         names[i] = region_from.name * " -> " * region_to.name
-        capacity[i, :] .= round(Int, iface.capacity_existing)
+        capacity[i, :] .= round(Int, iface.capacity_existing .* powerunits_MW)
 
         # Sort indices since PRAS requires from_idx < to_idx
         # Note: this would generally be dangerous, but no problem here since line limits are always symmetrical

@@ -1,5 +1,16 @@
 module C4
 
+# Internally represent power values in increments of 100MW.
+# Helps with numerical stability in optimization solver
+# Conversion to/from MW happens:
+#  - when loading data from disk
+#  - when formulating PRAS systems
+#  - when converting PRAS results to risk curves
+#    (slopes ok, but y-intercepts need correcting)
+#  - when writing results to disk
+
+const powerunits_MW = 100
+
 include("types.jl")
 include("jump_utils.jl")
 

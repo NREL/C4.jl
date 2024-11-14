@@ -41,7 +41,7 @@ mutable struct ExpansionProblem
         system::SystemParams,
         economic_periods::TimeProxyAssignment,
         eue_estimator::EUEEstimator,
-        eue_max::Vector{Float64},
+        eue_max::Vector{Float64}, # in powerunits_MWh
         optimizer)
 
         n_timesteps = length(system.timesteps)

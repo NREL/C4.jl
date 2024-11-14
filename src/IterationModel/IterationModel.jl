@@ -5,7 +5,7 @@ using C4.AdequacyModel
 using C4.DispatchModel
 using C4.ExpansionModel
 
-import ..store
+import ..store, ..powerunits_MW
 
 import Dates: Date, now
 import DBInterface
@@ -369,7 +369,7 @@ function estimator_params(steps::Vector{Float64}, n_samples::Int)
     prev_surplus = Inf
     prev_slope = 0
 
-    for (surplus, count) in unique_steps(steps)
+    for (surplus, count) in unique_steps(round.(Int, steps .* powerunits_MW))
 
         cum_count += count
         slope = cum_count / n_samples
@@ -379,7 +379,7 @@ function estimator_params(steps::Vector{Float64}, n_samples::Int)
         end
 
         push!(slopes, slope)
-        push!(intercepts, cum_eue + slope * surplus)
+        push!(intercepts, (cum_eue + slope * surplus) / powerunits_MW)
 
         prev_surplus = surplus
         prev_slope = slope

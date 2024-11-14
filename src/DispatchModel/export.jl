@@ -2,8 +2,9 @@ import DBInterface
 import DuckDB
 import Dates: DateTime
 
-import ..store
+import ..store, ..powerunits_MW
 
+# TODO: These should all live in IterationModel/exports.jl
 function store(
     con::DBInterface.Connection, pcm::EconomicDispatchProblem,
     timings::Pair{DateTime,DateTime}; iter::Int=0)
@@ -144,12 +145,12 @@ function store(
         DuckDB.append(appender.demands, period.name)
         DuckDB.append(appender.demands, i)
         DuckDB.append(appender.demands, name(region))
-        DuckDB.append(appender.demands, demand(region, t))
+        DuckDB.append(appender.demands, demand(region, t) * powerunits_MW)
         DuckDB.end_row(appender.demands)
 
         for gen in region.thermaltechs
 
-            dispatch = value(gen.dispatch[i])
+            dispatch = value(gen.dispatch[i]) * powerunits_MW
 
             DuckDB.append(appender.dispatches, iter)
             DuckDB.append(appender.dispatches, period.name)
@@ -163,7 +164,7 @@ function store(
 
         for gen in region.variabletechs
 
-            dispatch = value(gen.dispatch[i])
+            dispatch = value(gen.dispatch[i]) * powerunits_MW
 
             DuckDB.append(appender.dispatches, iter)
             DuckDB.append(appender.dispatches, period.name)
@@ -178,7 +179,7 @@ function store(
 
         for stor in region.storagetechs
 
-            dispatch = value(stor.dispatch[i])
+            dispatch = value(stor.dispatch[i]) * powerunits_MW
 
             DuckDB.append(appender.dispatches, iter)
             DuckDB.append(appender.dispatches, period.name)
@@ -203,7 +204,7 @@ function store(
 
     for (i, t) in enumerate(period.timesteps)
 
-        flow = value(interface.flow[i])
+        flow = value(interface.flow[i]) * powerunits_MW
 
         DuckDB.append(appender.flows, iter)
         DuckDB.append(appender.flows, period.name)

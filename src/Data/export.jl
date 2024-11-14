@@ -1,7 +1,7 @@
 import DBInterface
 import DuckDB
 
-import ..store
+import ..store, ..powerunits_MW
 
 struct DataAppender
 
@@ -109,8 +109,8 @@ function store(appender::DataAppender, gen::GeneratorParams, region::RegionParam
     DuckDB.append(appender.techs, gen.name)
     DuckDB.append(appender.techs, region.name)
     DuckDB.append(appender.techs, techtype(gen))
-    DuckDB.append(appender.techs, gen.cost_generation)
-    DuckDB.append(appender.techs, gen.cost_capital)
+    DuckDB.append(appender.techs, gen.cost_generation / powerunits_MW)
+    DuckDB.append(appender.techs, gen.cost_capital / powerunits_MW)
     DuckDB.append(appender.techs, nothing)
     DuckDB.end_row(appender.techs)
 
@@ -124,8 +124,8 @@ function store(appender::DataAppender, stor::StorageParams, region::RegionParams
     DuckDB.append(appender.techs, region.name)
     DuckDB.append(appender.techs, "storage")
     DuckDB.append(appender.techs, nothing)
-    DuckDB.append(appender.techs, stor.cost_capital_power)
-    DuckDB.append(appender.techs, stor.cost_capital_energy)
+    DuckDB.append(appender.techs, stor.cost_capital_power / powerunits_MW)
+    DuckDB.append(appender.techs, stor.cost_capital_energy / powerunits_MW)
     DuckDB.end_row(appender.techs)
 
     foreach(site -> store(appender, site, stor, region), stor.sites)
@@ -149,7 +149,7 @@ function store(appender::DataAppender, iface::InterfaceParams, regions::Vector{R
 
     DuckDB.append(appender.interfaces, region_from)
     DuckDB.append(appender.interfaces, region_to)
-    DuckDB.append(appender.interfaces, iface.cost_capital)
+    DuckDB.append(appender.interfaces, iface.cost_capital / powerunits_MW)
     DuckDB.end_row(appender.interfaces)
 
 end

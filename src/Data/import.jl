@@ -37,7 +37,7 @@ function load_regions(datadir::String)
     for c in 2:size(data, 2)
 
         regionname = String(data[1, c])
-        demand = Float64.(data[2:end, c])
+        demand = Float64.(data[2:end, c]) / powerunits_MW
 
         regionname in regionnames &&
             error("Region name $regionname is duplicated in $regionpath")
@@ -71,9 +71,9 @@ function load_interfaces(datadir::String, regions::Vector{RegionParams})
         name = string(data[i,1])
         region_from = string(data[i,2])
         region_to = string(data[i,3])
-        cost_capital = Float64(data[i,4])
-        capacity_existing = Float64(data[i,5])
-        capacity_new_max = Float64(data[i,6])
+        cost_capital = Float64(data[i,4]) * powerunits_MW
+        capacity_existing = Float64(data[i,5]) / powerunits_MW
+        capacity_new_max = Float64(data[i,6]) / powerunits_MW
 
         from_idx, region_from = getbyname(regions, region_from)
         to_idx, region_to = getbyname(regions, region_to)
@@ -106,9 +106,9 @@ function load_thermaltechs!(system::SystemParams, datadir::String)
 
         validate!(validator, regionname, techname)
 
-        cost_capital = Float64(techs[r, 3])
-        cost_generation = Float64(techs[r, 4])
-        size = Int(techs[r, 5])
+        cost_capital = Float64(techs[r, 3]) * powerunits_MW
+        cost_generation = Float64(techs[r, 4]) * powerunits_MW
+        size = techs[r, 5] / powerunits_MW
 
         tech = ThermalParams(
             techname, cost_capital, cost_generation, size, ThermalSiteParams[])
@@ -174,8 +174,8 @@ function load_variabletechs!(system::SystemParams, datadir::String)
 
         validate!(validator, regionname, techname)
 
-        cost_capital = Float64(techs[r, 3])
-        cost_generation = Float64(techs[r, 4])
+        cost_capital = Float64(techs[r, 3]) * powerunits_MW
+        cost_generation = Float64(techs[r, 4]) * powerunits_MW
 
         tech = VariableParams(
             techname, cost_capital, cost_generation, VariableSiteParams[])
@@ -206,8 +206,8 @@ function load_variablesites!(system::SystemParams, datadir::String)
 
         validate!(validator, (regionname, techname), sitename)
 
-        capacity_existing = Float64(sites[r, 4])
-        capacity_new_max = Float64(sites[r, 5])
+        capacity_existing = Float64(sites[r, 4]) / powerunits_MW
+        capacity_new_max = Float64(sites[r, 5]) / powerunits_MW
 
         site = VariableSiteParams(
             sitename, capacity_existing, capacity_new_max,
@@ -238,8 +238,8 @@ function load_storagetechs!(system::SystemParams, datadir::String)
 
         validate!(validator, regionname, techname)
 
-        cost_capital_power = Float64(techs[r, 3])
-        cost_capital_energy = Float64(techs[r, 4])
+        cost_capital_power = Float64(techs[r, 3]) * powerunits_MW
+        cost_capital_energy = Float64(techs[r, 4]) * powerunits_MW
 
         tech = StorageParams(
             techname, cost_capital_power, cost_capital_energy, StorageSiteParams[])
@@ -268,11 +268,11 @@ function load_storagesites!(system::SystemParams, datadir::String)
 
         validate!(validator, (regionname, techname), sitename)
 
-        power_existing = Float64(sites[r, 4])
-        power_new_max = Float64(sites[r, 5])
+        power_existing = Float64(sites[r, 4]) / powerunits_MW
+        power_new_max = Float64(sites[r, 5]) / powerunits_MW
 
-        energy_existing = Float64(sites[r, 6])
-        energy_new_max = Float64(sites[r, 7])
+        energy_existing = Float64(sites[r, 6]) / powerunits_MW
+        energy_new_max = Float64(sites[r, 7]) / powerunits_MW
 
         site = StorageSiteParams(
             sitename, power_existing, power_new_max,

@@ -165,7 +165,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
         has_variable = any(tech -> nameplatecapacity(tech) > 0, region.variabletechs)
         has_storage = any(tech -> powerrating(tech) > 0, region.storagetechs)
 
-        println(io, region.name, " (Peak Load: ", maximum(region.demand), " MW)")
+        println(io, region.name, " (Peak Load: ", maximum(region.demand) * powerunits_MW, " MW)")
 
         has_thermal || has_variable || has_storage ||
             println(io, "\t(No resources)")
@@ -174,20 +174,20 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
             n_units = num_units(thermaltech)
             iszero(n_units) && continue
             println(io, "\t", thermaltech.name, ": ",
-                    n_units, " x ", thermaltech.unit_size, " MW")
+                    n_units, " x ", thermaltech.unit_size * powerunits_MW, " MW")
         end
 
         has_variable && for variabletech in region.variabletechs
             capacity = nameplatecapacity(variabletech)
             iszero(capacity) && continue
-            println(io, "\t", variabletech.name, ": ", capacity, " MW")
+            println(io, "\t", variabletech.name, ": ", capacity * powerunits_MW, " MW")
         end
 
         has_storage && for storagetech in region.storagetechs
             power, energy = powerrating(storagetech), energyrating(storagetech)
             iszero(power) && continue
             println(io, "\t", storagetech.name, ": ",
-                    power, " MW (", energy / power, " h)")
+                    power * powerunits_MW, " MW (", energy / power, " h)")
         end
 
     end
@@ -195,7 +195,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
     length(sys.interfaces) > 0 && println(io, "\nInterfaces\n")
 
     for interface in sys.interfaces
-        println(io, interface.name, ": ", interface.capacity_existing, " MW")
+        println(io, interface.name, ": ", interface.capacity_existing * powerunits_MW, " MW")
     end
 
 end

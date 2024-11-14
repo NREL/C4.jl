@@ -8,7 +8,8 @@ import ..ThermalSite, ..VariableSite, ..StorageSite, ..Technology,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System, ..cost_generation,
        ..maxpower, ..maxenergy, ..availablecapacity, ..region_from, ..region_to,
-       ..demand, ..importinginterfaces, ..exportinginterfaces, ..name
+       ..demand, ..importinginterfaces, ..exportinginterfaces, ..name,
+       ..powerunits_MW
 
 # TODO: Rename Period -> DispatchPeriod and TimePeriod -> Period
 export availability, TimePeriod, Period, TimeProxyAssignment,

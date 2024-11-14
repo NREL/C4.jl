@@ -5,7 +5,7 @@ struct ThermalParams <: ThermalTechnology
     cost_capital::Float64 # $/MW
     cost_generation::Float64 # $/MWh
 
-    unit_size::Int # MW/unit
+    unit_size::Float64 # MW/unit
 
     sites::Vector{ThermalSiteParams}
 

@@ -1,7 +1,7 @@
 import DBInterface
 import DuckDB
 
-import ..store
+import ..store, ..powerunits_MW
 
 function store(
     con::DBInterface.Connection, result::AdequacyProblem,
@@ -61,8 +61,8 @@ function store(con::DBInterface.Connection, iter::Int, result::AdequacyProblem)
 
     DuckDB.append(appender.adequacies, iter)
     DuckDB.append(appender.adequacies, sum(region_demands))
-    DuckDB.append(appender.adequacies, result.eue)
-    DuckDB.append(appender.adequacies, result.eue_std)
+    DuckDB.append(appender.adequacies, result.eue * powerunits_MW)
+    DuckDB.append(appender.adequacies, result.eue_std * powerunits_MW)
     DuckDB.append(appender.adequacies, result.lole)
     DuckDB.append(appender.adequacies, result.lole_std)
     DuckDB.end_row(appender.adequacies)
@@ -72,8 +72,8 @@ function store(con::DBInterface.Connection, iter::Int, result::AdequacyProblem)
         DuckDB.append(appender.region_adequacies, iter)
         DuckDB.append(appender.region_adequacies, region_names[r])
         DuckDB.append(appender.region_adequacies, region_demands[r])
-        DuckDB.append(appender.region_adequacies, result.region_eues[r])
-        DuckDB.append(appender.region_adequacies, result.region_eue_stds[r])
+        DuckDB.append(appender.region_adequacies, result.region_eues[r] * powerunits_MW)
+        DuckDB.append(appender.region_adequacies, result.region_eue_stds[r] * powerunits_MW)
         DuckDB.append(appender.region_adequacies, result.region_loles[r])
         DuckDB.append(appender.region_adequacies, result.region_lole_stds[r])
         DuckDB.end_row(appender.region_adequacies)
