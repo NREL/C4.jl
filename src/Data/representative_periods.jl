@@ -53,21 +53,33 @@ singleperiod(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, x -> "Representative Period", daylength)
 
 seasonalperiods(sys::SystemParams; daylength::Int=24) =
-    medoid_timegrouping(sys, season, daylength)
+    medoid_timegrouping(sys, seasonname, daylength)
 
 monthlyperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, monthname, daylength)
 
 weeklyperiods(sys::SystemParams; daylength::Int=24) =
-    medoid_timegrouping(sys, x -> "Week $(week(x))", daylength)
+    medoid_timegrouping(sys, weekname, daylength)
 
+seasonalperiods_byyear(sys::SystemParams; daylength::Int=24) =
+    medoid_timegrouping(sys, byyear(seasonname), daylength)
+
+monthlyperiods_byyear(sys::SystemParams; daylength::Int=24) =
+    medoid_timegrouping(sys, byyear(monthname), daylength)
+
+weeklyperiods_byyear(sys::SystemParams; daylength::Int=24) =
+    medoid_timegrouping(sys, byyear(weekname), daylength)
+
+# Redundant with full chronology periods when using 24-hour days
 dailyperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, string ∘ Date, daylength)
 
 fullchronologyperiods(sys::SystemParams; daylength::Int=24) =
     medoid_timegrouping(sys, string, daylength)
 
-function season(dt::DateTime)
+weekname(dt::DateTime) = "Week " * string(week(dt))
+
+function seasonname(dt::DateTime)
     m = month(dt)
     if m <=2 || m == 12
         "Winter"
@@ -79,6 +91,8 @@ function season(dt::DateTime)
         "Fall"
     end
 end
+
+byyear(f::Function) = (dt -> f(dt) * " " * string(year(dt)))
 
 function num_features(sys::SystemParams)
 

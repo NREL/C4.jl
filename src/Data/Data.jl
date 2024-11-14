@@ -18,9 +18,11 @@ export availability, TimePeriod, Period, TimeProxyAssignment,
        VariableParams, VariableSiteParams,
        StorageParams, StorageSiteParams,
        RegionParams, InterfaceParams, SystemParams,
-       timestepcount,
-       singleperiod, seasonalperiods, monthlyperiods,
-       weeklyperiods, dailyperiods, fullchronologyperiods,
+       timestepcount, total_demand,
+       singleperiod,
+       seasonalperiods, monthlyperiods, weeklyperiods,
+       seasonalperiods_byyear, monthlyperiods_byyear, weeklyperiods_byyear,
+       dailyperiods, fullchronologyperiods,
        store_iteration, store_iteration_step
 
 include("time.jl")
