@@ -97,6 +97,9 @@ function get_site(
 
 end
 
+total_demand(sys::SystemParams) =
+    sum(sum(region.demand) for region in sys.regions)
+
 function regiontechsiteset(system::SystemParams, techtype::Type{<:Technology})
     result = Set{Tuple{String,String,String}}()
     for region in system.regions
