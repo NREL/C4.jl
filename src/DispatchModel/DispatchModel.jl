@@ -44,7 +44,7 @@ struct DispatchProblem{D<:DispatchSequence}
         timestepcount(periods) == n_timesteps ||
             error("Period assignment is incompatible with system timesteps")
 
-        m = JuMP.Model(optimizer) 
+        m = JuMP.direct_model(optimizer)
 
         dispatch = DispatchSequence(D, m, system, periods)
 

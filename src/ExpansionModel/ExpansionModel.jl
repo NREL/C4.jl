@@ -56,7 +56,7 @@ mutable struct ExpansionProblem
         length(eue_max) == n_regions ||
             error("Mismatch between EUE constraint count and system regions")
 
-        m = JuMP.Model(optimizer)
+        m = JuMP.direct_model(optimizer)
 
         builds = SystemExpansion(
             [RegionExpansion(m, r) for r in system.regions],
