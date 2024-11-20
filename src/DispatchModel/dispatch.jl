@@ -34,10 +34,11 @@ name(dispatch::GeneratorDispatch) = name(dispatch.gen)
 
 struct StorageSiteDispatch{S<:StorageSite}
 
-    dispatch::Vector{JuMP.VariableRef}
+    charge::Vector{JuMP.VariableRef}
+    discharge::Vector{JuMP.VariableRef}
 
-    dispatch_min::Vector{JuMP_LessThanConstraintRef}
-    dispatch_max::Vector{JuMP_LessThanConstraintRef}
+    charge_max::Vector{JuMP_LessThanConstraintRef}
+    discharge_max::Vector{JuMP_LessThanConstraintRef}
 
     e_net::JuMP_ExpressionRef # MWh
 
@@ -55,30 +56,39 @@ struct StorageSiteDispatch{S<:StorageSite}
 
         T = length(period)
 
-        dispatch = @variable(m, [1:T])
+        charge = @variable(m, [1:T], lower_bound = 0)
         fullname = join([name(region), name(stor), name(site), period.name], ",")
-        varnames!(dispatch, "stor_dispatch[$(fullname)]", 1:T)
+        varnames!(charge, "stor_charge[$(fullname)]", 1:T)
+
+        discharge = @variable(m, [1:T], lower_bound = 0)
+        fullname = join([name(region), name(stor), name(site), period.name], ",")
+        varnames!(discharge, "stor_discharge[$(fullname)]", 1:T)
 
         capacity = maxpower(site)
+        eff = sqrt(roundtrip_efficiency(stor))
 
-        dispatch_min = @constraint(m, [t in 1:T], -capacity <= dispatch[t])
-        dispatch_max = @constraint(m, [t in 1:T], dispatch[t] <= capacity)
+        charge_max = @constraint(m, [t in 1:T], charge[t] <= capacity)
+        discharge_max = @constraint(m, [t in 1:T], discharge[t] <= capacity)
 
-        e_net = @expression(m, sum(dispatch))
+        e_net = @expression(m, eff * sum(charge) - 1/eff * sum(discharge))
 
         e_high = @variable(m, base_name="stor_ΔE_high[$(fullname)]")
-        e_high_def = @constraint(m, [t in 1:T], sum(dispatch[1:t]) <= e_high)
+        e_high_def = @constraint(m, [t in 1:T],
+            eff * sum(charge[1:t]) - 1/eff * sum(discharge[1:t]) <= e_high)
 
         e_low = @variable(m, base_name="stor_ΔE_low[$(fullname)]")
-        e_low_def = @constraint(m, [t in 1:T], e_low <= sum(dispatch[1:t]))
+        e_low_def = @constraint(m, [t in 1:T],
+            e_low <= eff * sum(charge[1:t]) - 1/eff * sum(discharge[1:t]))
 
         return new{SS}(
-            dispatch, dispatch_min, dispatch_max,
+            charge, discharge, charge_max, discharge_max,
             e_net, e_high, e_high_def, e_low, e_low_def, site)
 
     end
 
 end
+
+usage(dispatch::StorageSiteDispatch) = sum(dispatch.charge) + sum(dispatch.discharge)
 
 struct StorageDispatch{ST<:StorageTechnology, SS<:StorageSite}
 
@@ -98,7 +108,7 @@ struct StorageDispatch{ST<:StorageTechnology, SS<:StorageSite}
                  for site in stor.sites]
 
         dispatch = @expression(m, [t in 1:T],
-           sum(site.dispatch[t] for site in sites)
+           sum(site.discharge[t] - site.charge[t] for site in sites)
         )
 
         return new{ST, SS}(sites, dispatch, stor)
@@ -108,6 +118,8 @@ struct StorageDispatch{ST<:StorageTechnology, SS<:StorageSite}
 end
 
 name(dispatch::StorageDispatch) = name(dispatch.stor)
+cost(dispatch::StorageDispatch) =
+    sum(usage(site) for site in dispatch.sites; init=0) * operating_cost(dispatch.stor)
 
 struct InterfaceDispatch{I<:Interface}
 

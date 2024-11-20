@@ -12,7 +12,7 @@ import C4.store
 using DuckDB
 
 import HiGHS
-import JuMP: optimizer_with_attributes, value, termination_status
+import JuMP: optimizer_with_attributes, value, termination_status, write_to_file
 
 include("DispatchModel/sequencing.jl")
 include("IterationModel/eue_estimator.jl")
@@ -40,6 +40,7 @@ ram_end = now()
 println("NEUE: ", ram.region_neue)
 
 cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
+write_to_file(cem.model, "model.lp")
 
 cem_start = now()
 cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)

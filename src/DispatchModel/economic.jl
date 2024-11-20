@@ -49,7 +49,8 @@ end
 
 cost(dispatch::RegionEconomicDispatch) =
     sum(cost(thermaltech) for thermaltech in dispatch.thermaltechs; init=0) +
-    sum(cost(variabletech) for variabletech in dispatch.variabletechs; init=0)
+    sum(cost(variabletech) for variabletech in dispatch.variabletechs; init=0) +
+    sum(cost(storagetech) for storagetech in dispatch.storagetechs; init=0)
 
 struct EconomicDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch{S}
 

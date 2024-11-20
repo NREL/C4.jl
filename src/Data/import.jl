@@ -240,9 +240,12 @@ function load_storagetechs!(system::SystemParams, datadir::String)
 
         cost_capital_power = Float64(techs[r, 3]) * powerunits_MW
         cost_capital_energy = Float64(techs[r, 4]) * powerunits_MW
+        cost_operation = Float64(techs[r, 5]) * powerunits_MW
+        roundtrip_efficiency = Float64(techs[r, 6])
 
         tech = StorageParams(
-            techname, cost_capital_power, cost_capital_energy, StorageSiteParams[])
+            techname, cost_capital_power, cost_capital_energy, cost_operation,
+            roundtrip_efficiency, StorageSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
         push!(region.storagetechs, tech)

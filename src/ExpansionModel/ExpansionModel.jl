@@ -7,6 +7,7 @@ import ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System, ..varnames!,
        ..availablecapacity, ..maxpower, ..maxenergy,
+       ..roundtrip_efficiency, ..operating_cost,
        ..name, ..cost, ..cost_generation, ..region_from, ..region_to,
        ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
 
@@ -82,17 +83,16 @@ mutable struct ExpansionProblem
         for r in system.regions
             r_vg_min = minimum(t.cost_generation for t in r.variabletechs)
             r_vg_min < min_opex && (min_opex = r_vg_min)
-            r_therm_min = minimum(t.cost_generation for t in r.variabletechs)
+            r_therm_min = minimum(t.cost_generation for t in r.thermaltechs)
             r_therm_min < min_opex && (min_opex = r_therm_min)
         end
 
         # Note this uses full-chronology demand, not necessarily
         # what economic dispatch sees - TODO: improve this
         opex_lower_bound = total_demand(system) * min_opex
-        @show opex_lower_bound
 
-        @objective(m, Min, cost(builds) + opex_scalar * cost(economicdispatch)
-                   - opex_lower_bound)
+        @objective(m, Min, cost(builds) +
+                   opex_scalar * (cost(economicdispatch) - opex_lower_bound))
 
         return new(m, system, builds, economicdispatch,
                    reliabilitydispatch, reliabilityconstraints)

@@ -254,6 +254,7 @@ function load_storages(sys::SystemParams, meta)
     categories = Vector{String}(undef, n_stors)
     power_capacity = Matrix{Int}(undef, n_stors, meta.N)
     energy_capacity = Matrix{Int}(undef, n_stors, meta.N)
+    oneway_efficiency = Matrix{Float64}(undef, n_stors, meta.N)
 
     allones = ones(n_stors, meta.N)
     allzeros = zeros(n_stors, meta.N)
@@ -265,6 +266,7 @@ function load_storages(sys::SystemParams, meta)
         s_first = s_last + 1
 
         for tech in region.storagetechs
+            efficiency = sqrt(tech.roundtrip_efficiency)
             for site in tech.sites
                 sitename = join([region.name, tech.name, site.name], "_")
                 if site.power_existing > 0 && site.energy_existing > 0
@@ -273,6 +275,7 @@ function load_storages(sys::SystemParams, meta)
                     categories[s_last] = tech.name
                     power_capacity[s_last, :] .= round(Int, site.power_existing .* powerunits_MW)
                     energy_capacity[s_last, :] .= round(Int, site.energy_existing .* powerunits_MW)
+                    oneway_efficiency[s_last, :] .= efficiency
                 end
             end
         end
@@ -284,7 +287,7 @@ function load_storages(sys::SystemParams, meta)
     storages = Storages{meta.N, meta.L, meta.T, meta.P, meta.E}(
         names, categories,
         power_capacity, power_capacity, energy_capacity,
-        allones, allones, allones, allzeros, allones)
+        oneway_efficiency, oneway_efficiency, allones, allzeros, allones)
 
     return storages, region_stor_idxs
 

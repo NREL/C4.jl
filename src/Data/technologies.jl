@@ -2,7 +2,7 @@ struct ThermalParams <: ThermalTechnology
 
     name::String
 
-    cost_capital::Float64 # $/MW
+    cost_capital::Float64 # annualized $/MW
     cost_generation::Float64 # $/MWh
 
     unit_size::Float64 # MW/unit
@@ -29,7 +29,7 @@ struct VariableParams <: VariableTechnology
 
     name::String
 
-    cost_capital::Float64 # $/MW
+    cost_capital::Float64 # annualized $/MW
     cost_generation::Float64 # $/MWh
 
     sites::Vector{VariableSiteParams}
@@ -50,8 +50,11 @@ struct StorageParams <: StorageTechnology{StorageSiteParams}
 
     name::String
 
-    cost_capital_power::Float64 # $/MW
-    cost_capital_energy::Float64 # $/MWh
+    cost_capital_power::Float64 # annualized $/MW
+    cost_capital_energy::Float64 # annualized $/MWh
+    cost_operation::Float64 # $/MWh
+
+    roundtrip_efficiency::Float64
 
     sites::Vector{StorageSiteParams}
 
@@ -62,6 +65,10 @@ powerrating(tech::StorageParams) =
 
 energyrating(tech::StorageParams) =
     sum(site.energy_existing for site in tech.sites; init=0)
+
+roundtrip_efficiency(tech::StorageParams) = tech.roundtrip_efficiency
+
+operating_cost(tech::StorageParams) = tech.cost_operation
 
 const TechnologyParams = Union{GeneratorParams,StorageParams}
 name(tech::TechnologyParams) = tech.name

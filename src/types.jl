@@ -39,6 +39,8 @@ rating_energy(::StorageTechnology)
 abstract type StorageTechnology{SS<:StorageSite} <: Technology end
 function maxenergy end
 function maxpower end
+function operating_cost end
+function roundtrip_efficiency end
 
 abstract type ThermalTechnology <: GeneratorTechnology end
 abstract type VariableTechnology <: GeneratorTechnology end

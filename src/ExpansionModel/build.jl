@@ -229,11 +229,16 @@ cost(build::StorageExpansion) =
     sum(site.power_new for site in build.sites; init=0) * build.params.cost_capital_power +
     sum(site.energy_new for site in build.sites; init=0) * build.params.cost_capital_energy
 
+operating_cost(build::StorageExpansion) = operating_cost(build.params)
+
+roundtrip_efficiency(build::StorageExpansion) = roundtrip_efficiency(build.params)
+
 function StorageParams(build::StorageExpansion)
     storage = build.params
     return StorageParams(
         storage.name,
         storage.cost_capital_power, storage.cost_capital_energy,
+        storage.cost_operation, storage.roundtrip_efficiency,
         StorageSiteParams.(build.sites))
 end
 
