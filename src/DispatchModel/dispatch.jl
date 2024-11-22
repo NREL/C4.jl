@@ -40,7 +40,8 @@ struct StorageSiteDispatch{S<:StorageSite}
     charge_max::Vector{JuMP_LessThanConstraintRef}
     discharge_max::Vector{JuMP_LessThanConstraintRef}
 
-    e_net::JuMP_ExpressionRef # MWh
+    e_net::JuMP.VariableRef # MWh
+    e_net_def::JuMP_EqualToConstraintRef
 
     e_high::JuMP.VariableRef # MWh
     e_high_def::Vector{JuMP_LessThanConstraintRef}
@@ -70,7 +71,8 @@ struct StorageSiteDispatch{S<:StorageSite}
         charge_max = @constraint(m, [t in 1:T], charge[t] <= capacity)
         discharge_max = @constraint(m, [t in 1:T], discharge[t] <= capacity)
 
-        e_net = @expression(m, eff * sum(charge) - 1/eff * sum(discharge))
+        e_net = @variable(m)
+        e_net_def = @constraint(m, e_net == eff * sum(charge) - 1/eff * sum(discharge))
 
         e_high = @variable(m, base_name="stor_ΔE_high[$(fullname)]")
         e_high_def = @constraint(m, [t in 1:T],
@@ -82,7 +84,7 @@ struct StorageSiteDispatch{S<:StorageSite}
 
         return new{SS}(
             charge, discharge, charge_max, discharge_max,
-            e_net, e_high, e_high_def, e_low, e_low_def, site)
+            e_net, e_net_def, e_high, e_high_def, e_low, e_low_def, site)
 
     end
 
