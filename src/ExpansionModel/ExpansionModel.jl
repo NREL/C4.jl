@@ -40,7 +40,6 @@ mutable struct ExpansionProblem
 
     function ExpansionProblem(
         system::SystemParams,
-        economic_periods::TimeProxyAssignment,
         eue_estimator::EUEEstimator,
         eue_max::Vector{Float64}, # in powerunits_MWh
         optimizer)
@@ -48,11 +47,8 @@ mutable struct ExpansionProblem
         n_timesteps = length(system.timesteps)
         n_regions = length(system.regions)
 
-        timestepcount(economic_periods) == n_timesteps ||
-            error("Economic period assignment is incompatible with system timesteps")
-
         timestepcount(eue_estimator.times) == n_timesteps ||
-            error("Reliability period assignment is incompatible with system timesteps")
+            error("Time period assignment is incompatible with system timesteps")
 
         length(eue_max) == n_regions ||
             error("Mismatch between EUE constraint count and system regions")
@@ -64,7 +60,7 @@ mutable struct ExpansionProblem
             [InterfaceExpansion(m, i) for i in system.interfaces])
 
         economicdispatch = DispatchSequence(
-            EconomicDispatch, m, builds, economic_periods)
+            EconomicDispatch, m, builds, eue_estimator.times)
 
         reliabilitydispatch = DispatchSequence(
             ReliabilityDispatch, m, builds, eue_estimator.times)

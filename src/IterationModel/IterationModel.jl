@@ -18,7 +18,7 @@ export iterate_ra_cem
 include("eue_estimator_compression.jl")
 
 function iterate_ra_cem(
-    sys::SystemParams, economic_chronology::TimeProxyAssignment,
+    sys::SystemParams, base_chronology::TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
     timeout::Float64=Inf,
@@ -54,7 +54,7 @@ function iterate_ra_cem(
 
     curves_start = now()
     eue_estimator = bootstrap_estimator(
-        sys, economic_chronology, ram, eue_tols,
+        sys, base_chronology, ram, eue_tols,
         aspp=aspp, endog_risk=endog_risk)
     curves_end = now()
 
@@ -80,7 +80,7 @@ function iterate_ra_cem(
         n_iters += 1
         cem_start = now()
 
-        cem = ExpansionProblem(sys, economic_chronology, eue_estimator, max_eues, optimizer)
+        cem = ExpansionProblem(sys, eue_estimator, max_eues, optimizer)
         isnothing(prev_cem) || warmstart_builds!(cem, prev_cem)
 
         println("Recurrences:")
@@ -132,7 +132,7 @@ function iterate_ra_cem(
 
         pcm_start = now()
         n_iters += 1
-        fullchrono = fullchronologyperiods(sys_built, daylength=economic_chronology.daylength)
+        fullchrono = fullchronologyperiods(sys_built, daylength=base_chronology.daylength)
         pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
         solve!(pcm)
         pcm_end = now()

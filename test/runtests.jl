@@ -30,22 +30,17 @@ timestamp = Dates.format(now(), "yyyymmddHHMMSS")
 fullchrono = fullchronologyperiods(sys, daylength=2)
 repeatedchrono = singleperiod(sys, daylength=2)
 
-eue_estimator = nullestimator(sys, fullchrono)
 max_eues = zeros(3)
 
-ram_start = now()
 ram = AdequacyProblem(sys, samples=1000)
 solve!(ram)
-ram_end = now()
 println("NEUE: ", ram.region_neue)
 
-cem = ExpansionProblem(sys, repeatedchrono, eue_estimator, max_eues, optimizer)
+cem = ExpansionProblem(sys, nullestimator(sys, repeatedchrono), max_eues, optimizer)
 write_to_file(cem.model, "model.lp")
 
-cem_start = now()
-cem = ExpansionProblem(sys, fullchrono, eue_estimator, max_eues, optimizer)
+cem = ExpansionProblem(sys, nullestimator(sys, fullchrono), max_eues, optimizer)
 solve!(cem)
-cem_end = now()
 
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
