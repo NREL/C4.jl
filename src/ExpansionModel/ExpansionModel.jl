@@ -102,7 +102,9 @@ function lcoe(prob::ExpansionProblem)
 
     # Note: total demand here is the full-chronology demand,
     #       not necessarily what economic dispatch sees
-    return cost(prob) /  (demand_scaler * total_demand(prob.system))
+    demand = total_demand(prob.system) * powerunits_MW * demand_scaler
+
+    return cost(prob) / demand
 
 end
 
