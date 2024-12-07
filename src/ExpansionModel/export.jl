@@ -63,10 +63,14 @@ function store(con::DBInterface.Connection, iter::Int, sys::SystemExpansion)
 
     DuckDB.close(appender)
 
-    # TODO: Transmission expansion costs
-    DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_capex AS
+    DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_tech_capex AS
         SELECT iteration, site, tech, region, power * cost_capital_power as cost_power, energy * cost_capital_energy as cost_energy
         FROM sitebuilds JOIN techs USING (tech, region)
+    ")
+
+    DBInterface.execute(con, "CREATE VIEW IF NOT EXISTS summary_tx_capex AS
+        SELECT iteration, region_from, region_to, capacity * cost_capital AS cost
+        FROM interfacebuilds JOIN interfaces USING (region_from, region_to)
     ")
 
 end
