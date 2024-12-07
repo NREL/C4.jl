@@ -74,25 +74,7 @@ mutable struct ExpansionProblem
 
         opex_scalar = 8766 / n_timesteps
 
-        # For calculating investment MIP gap, offset objective by lowest
-        # possible opex so that un-optimizable opex contributions don't skew
-        # perceived relative solution quality
-
-        # TODO: Define iterators over techs and sites (in Data module)?
-        min_opex = Inf
-        for r in system.regions
-            r_vg_min = minimum(t.cost_generation for t in r.variabletechs)
-            r_vg_min < min_opex && (min_opex = r_vg_min)
-            r_therm_min = minimum(t.cost_generation for t in r.thermaltechs)
-            r_therm_min < min_opex && (min_opex = r_therm_min)
-        end
-
-        # Note this uses full-chronology demand, not necessarily
-        # what economic dispatch sees - TODO: improve this
-        opex_lower_bound = total_demand(system) * min_opex
-
-        @objective(m, Min, cost(builds) +
-                   opex_scalar * (cost(economicdispatch) - opex_lower_bound))
+        @objective(m, Min, cost(builds) + opex_scalar * cost(economicdispatch))
 
         return new(m, system, builds, economicdispatch,
                    reliabilitydispatch, reliabilityconstraints)
