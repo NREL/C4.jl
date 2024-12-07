@@ -101,7 +101,10 @@ mutable struct ExpansionProblem
 
 end
 
-solve!(prob::ExpansionProblem) = JuMP.optimize!(prob.model)
+function solve!(prob::ExpansionProblem)
+    flush(stdout)
+    JuMP.optimize!(prob.model)
+end
 
 # Capex is annualized, so scale opex to approximate an annual cost
 opex(prob::ExpansionProblem) =

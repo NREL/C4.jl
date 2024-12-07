@@ -61,7 +61,10 @@ end
 const EconomicDispatchProblem = DispatchProblem{<:EconomicDispatchSequence}
 const ReliabilityDispatchProblem = DispatchProblem{<:ReliabilityDispatchSequence}
 
-solve!(prob::DispatchProblem) = JuMP.optimize!(prob.model)
+function solve!(prob::DispatchProblem)
+    flush(stdout)
+    JuMP.optimize!(prob.model)
+end
 
 cost(prob::DispatchProblem) =
     8766 / length(prob.system.timesteps) * cost(prob.dispatch)
