@@ -21,7 +21,7 @@ function iterate_ra_cem(
     sys::SystemParams, base_chronology::TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
-    timeout::Float64=Inf,
+    timeout::Float64=Inf, first_feasible::Bool=true,
     aspp::Bool=true, endog_risk::Bool=true, outfile::String="",
     check_dispatch::Bool=false)
 
@@ -117,11 +117,13 @@ function iterate_ra_cem(
             store(con, n_iters, ram)
             store_end = now()
             store_iteration_step(con, n_iters, "persistence", store_start => store_end)
+            DBInterface.execute(con, "CHECKPOINT")
         end
 
         prev_cem = cem
 
-        is_adequate && break
+        first_feasible && is_adequate && break
+
         aspp || endog_risk || break
 
     end
