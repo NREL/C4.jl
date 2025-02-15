@@ -19,13 +19,11 @@ using ..Data
 include("dispatch.jl")
 include("sequencing.jl")
 include("economic.jl")
-include("eue_estimator.jl")
 include("reliability.jl")
 
 export DispatchProblem, EconomicDispatchProblem, ReliabilityDispatchProblem,
        DispatchSequence, EconomicDispatchSequence, ReliabilityDispatchSequence,
-       EconomicDispatch, ReliabilityDispatch,
-       ReliabilityConstraints, EUEEstimator, PeriodEUEEstimator, nullestimator
+       EconomicDispatch, ReliabilityDispatch
 
 struct DispatchProblem{D<:DispatchSequence}
 
@@ -62,8 +60,14 @@ const EconomicDispatchProblem = DispatchProblem{<:EconomicDispatchSequence}
 const ReliabilityDispatchProblem = DispatchProblem{<:ReliabilityDispatchSequence}
 
 function solve!(prob::DispatchProblem)
+
     flush(stdout)
+
     JuMP.optimize!(prob.model)
+
+    JuMP.termination_status(prob.model) == JuMP.OPTIMAL ||
+        @error "Problem did not solve to optimality"
+
 end
 
 cost(prob::DispatchProblem) =

@@ -2,7 +2,7 @@ struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
 
     storagetechs::Vector{StorageDispatch{ST,SS}}
 
-    surplus_mean::Vector{JuMP_ExpressionRef}
+    nonthermal_available::Vector{JuMP_ExpressionRef}
 
     import_interfaces::Vector{InterfaceDispatch{I}}
     export_interfaces::Vector{InterfaceDispatch{I}}
@@ -22,17 +22,14 @@ struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
         storagedispatch = [StorageDispatch(m, region, stor, period)
                            for stor in region.storagetechs]
 
-        surplus_mean = @expression(m, [t in 1:n_timesteps],
-            sum(availablecapacity(gen, ts[t]) for gen in region.variabletechs)
-            + sum(availablecapacity(gen, ts[t]) for gen in region.thermaltechs)
-            + sum(stor.dispatch[t] for stor in storagedispatch)
-            - demand(region, ts[t])
-        )
+        nonthermal_available = @expression(m, [t in 1:n_timesteps],
+                sum(availablecapacity(gen, ts[t]) for gen in region.variabletechs)
+                + sum(stor.dispatch[t] for stor in storagedispatch))
 
         import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
         export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
-        new{R,ST,SS,I}(storagedispatch, surplus_mean,
+        new{R,ST,SS,I}(storagedispatch, nonthermal_available,
                        import_interfaces, export_interfaces, region)
 
     end
@@ -47,8 +44,7 @@ struct ReliabilityDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch
     interfaces::Vector{InterfaceDispatch}
 
     netimports::Matrix{JuMP_ExpressionRef}
-    surplus_mean::Matrix{JuMP_ExpressionRef}
-    surplus_floor::Matrix{JuMP_LessThanConstraintRef}
+    nonthermal_available::Matrix{JuMP_ExpressionRef}
 
     system::S
 
@@ -60,7 +56,7 @@ struct ReliabilityDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch
         n_regions = length(system.regions)
 
         interfaces = [InterfaceDispatch(m, iface, period)
-                   for iface in system.interfaces]
+                      for iface in system.interfaces]
 
         regions = [RegionReliabilityDispatch(m, region, interfaces, period)
                    for region in system.regions]
@@ -70,16 +66,11 @@ struct ReliabilityDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch
            sum(iface.flow[t] for iface in regions[r].export_interfaces)
         )
 
-        surplus_mean = @expression(m, [r in 1:n_regions, t in 1:n_timesteps],
-            regions[r].surplus_mean[t] + netimports[r,t]
-        )
-
-        surplus_floor = @constraint(m, [r in 1:n_regions, t in 1:n_timesteps],
-            0 <= surplus_mean[r,t]
-        )
+        nonthermal_available = @expression(m, [r in 1:n_regions, t in 1:n_timesteps],
+            regions[r].nonthermal_available[t] + netimports[r,t])
 
         new{S,R,I}(period, regions, interfaces, netimports,
-            surplus_mean, surplus_floor, system)
+                   nonthermal_available, system)
 
     end
 
@@ -88,62 +79,3 @@ end
 const ReliabilityDispatchSequence = DispatchSequence{<:ReliabilityDispatch}
 
 cost(dispatch::ReliabilityDispatch) = 0
-
-struct ReliabilityEstimate
-
-    period::TimePeriod
-
-    eue::Matrix{JuMP.VariableRef}
-    eue_segments::JuMP.Containers.SparseAxisArray{JuMP_GreaterThanConstraintRef,3,Tuple{Int64,Int64,Int64}}
-
-    function ReliabilityEstimate(
-        m::JuMP.Model, system::System, dispatch::ReliabilityDispatch,
-        eue_estimator::PeriodEUEEstimator)
-
-        T = length(dispatch.period)
-        R = length(system.regions)
-        period_name = dispatch.period.name
-
-        eue = @variable(m, [1:R, 1:T], lower_bound = 0)
-        varnames!(eue, "eue[$(period_name)]", name.(system.regions), 1:T)
-
-        eue_segments = @constraint(m, [r in 1:R, t in 1:T, s in 1:n_segments(eue_estimator, r, t)],
-            eue[r,t] >= intercept(eue_estimator, r, t, s)
-                        - dispatch.surplus_mean[r,t] * slope(eue_estimator, r, t, s)
-        )
-
-        new(dispatch.period, eue, eue_segments)
-
-    end
-
-end
-
-struct ReliabilityConstraints
-
-    estimates::Vector{ReliabilityEstimate}
-
-    region_eue::Vector{JuMP_ExpressionRef}
-    region_eue_max::Vector{JuMP_LessThanConstraintRef}
-
-    function ReliabilityConstraints(
-        m::JuMP.Model, system::System, dispatches::Vector{<:ReliabilityDispatch},
-        eue_estimator::EUEEstimator, eue_max::Vector{Float64})
-
-        n_regions = length(system.regions)
-
-        eue_estimates = [
-            ReliabilityEstimate(m, system, dispatch, estimator)
-            for (dispatch, estimator)
-            in zip(dispatches, eue_estimator.estimators)]
-
-        region_eue = @expression(m, [r in 1:n_regions],
-            sum(sum(estimate.eue[r, :]) for estimate in eue_estimates))
-
-        region_eue_max = @constraint(m, [r in 1:n_regions],
-            region_eue[r] <= eue_max[r])
-
-        new(eue_estimates, region_eue, region_eue_max)
-
-    end
-
-end

@@ -6,21 +6,27 @@ using C4.DispatchModel
 using C4.ExpansionModel
 
 import ..store, ..powerunits_MW
+import C4.ExpansionModel: RiskEstimateParams, RiskEstimatePeriodParams,
+                          RiskEstimatePlaneParams, ThermalTechRiskEstimateParams,
+                          ThermalSiteRiskEstimateParams
+import C4.AdequacyModel: ThermalRegionUnitCount, ThermalRegionAdequacyImpact,
+                         ThermalTechUnitCount, ThermalTechAdequacyImpact,
+                         ThermalSiteUnitCount, ThermalSiteAdequacyImpact
 
+import Base: +
 import Dates: Date, now
 import DBInterface
 import DelimitedFiles: writedlm
 import DuckDB
 import JuMP: value
+import PRAS: EUE, NEUE, val
 
 export iterate_ra_cem
-
-include("eue_estimator_compression.jl")
 
 function iterate_ra_cem(
     sys::SystemParams, base_chronology::TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
-    nsamples::Int=1000, neue_tols::Vector{Float64}=Float64[],
+    nsamples::Int=1000, skip_existing_stress_periods::Bool=false,
     timeout::Float64=Inf, first_feasible::Bool=true,
     aspp::Bool=true, endog_risk::Bool=true, outfile::String="",
     check_dispatch::Bool=false)
@@ -32,31 +38,34 @@ function iterate_ra_cem(
     neue_factors = [sum(region.demand) * 1e-6 for region in sys.regions]
     max_eues = max_neues .* neue_factors
 
-    if length(neue_tols) > 0
+    n_regions = length(sys.regions)
 
-        all(neue_tols .< max_neues) ||
-            error("NEUE compression error tolerances must be less than the provided NEUE thresholds")
-        eue_tols = neue_tols .* neue_factors
-
-        # We assume the worst and require that NEUE estimate + max_error <= threshold
-        max_eues .-= eue_tols
-
-    else
-        eue_tols = zeros(length(sys.regions))
-    end
+    adequacy_results = AdequacyContext[]
 
     ram_start = now()
     ram = AdequacyProblem(sys, samples=nsamples)
-    solve!(ram)
+    ram_result = solve(ram)
+    push!(adequacy_results, AdequacyContext(sys, ram_result))
     ram_end = now()
 
-    println(ram.region_neue)
+    show_neues(ram_result)
 
-    curves_start = now()
-    eue_estimator = bootstrap_estimator(
-        sys, base_chronology, ram, eue_tols,
-        aspp=aspp, endog_risk=endog_risk)
-    curves_end = now()
+    aug_start = now()
+
+    chronology = if aspp
+        add_stressperiod(sys, base_chronology, ram_result,
+                         skip_existing=skip_existing_stress_periods)
+    else
+        base_chronology
+    end
+
+    eue_estimator = if endog_risk
+        RiskEstimateParams(chronology, adequacy_results)
+    else
+        nullestimator(chronology, n_regions)
+    end
+
+    aug_end = now()
 
     if persist
         store_start = now()
@@ -64,8 +73,8 @@ function iterate_ra_cem(
         store(con, sys)
         store_iteration(con, 0)
         store_iteration_step(con, 0, "adequacy", ram_start => ram_end)
-        store(con, 0, ram)
-        store_iteration_step(con, 0, "riskcurves", curves_start => curves_end)
+        store(con, 0, ram_result)
+        store_iteration_step(con, 0, "augmentation", aug_start => aug_end)
         store_end = now()
         store_iteration_step(con, 0, "persistence", store_start => store_end)
     end
@@ -94,27 +103,37 @@ function iterate_ra_cem(
         ram_start = now()
         sys_built = SystemParams(cem)
         ram = AdequacyProblem(sys_built, samples=nsamples)
-        solve!(ram)
+        ram_result = solve(ram)
+        push!(adequacy_results, AdequacyContext(cem, ram_result))
         ram_end = now()
 
-        println(ram.neue, "\t", ram.region_neue, "\n")
+        show_neues(ram_result)
 
-        is_adequate = all(ram.region_neue .<= max_neues)
+        is_adequate = all(region_neues(ram_result) .<= max_neues)
 
-        curves_start = now()
-        eue_estimator = update_estimator(cem, ram, eue_estimator, eue_tols,
-                                         aspp=aspp, endog_risk=endog_risk)
-        curves_end = now()
+        aug_start = now()
+
+        aspp && (chronology = add_stressperiod(sys, chronology, ram_result,
+                                               skip_existing=skip_existing_stress_periods))
+
+        eue_estimator = if endog_risk
+            RiskEstimateParams(chronology, adequacy_results)
+        else
+            nullestimator(chronology, n_regions)
+        end
+
+        aug_end = now()
 
         if persist
             store_start = now()
             store_iteration(con, n_iters)
             store_iteration_step(con, n_iters, "expansion", cem_start => cem_end)
             store_iteration_step(con, n_iters, "adequacy", ram_start => ram_end)
-            store_iteration_step(con, n_iters, "riskcurves", curves_start => curves_end)
+            store_iteration_step(con, n_iters, "augmentation", aug_start => aug_end)
             store(con, n_iters, cem.builds)
             store(con, n_iters, cem.economicdispatch)
-            store(con, n_iters, ram)
+            store(con, n_iters, ram_result)
+            DBInterface.execute(con, "CHECKPOINT")
             store_end = now()
             store_iteration_step(con, n_iters, "persistence", store_start => store_end)
             DBInterface.execute(con, "CHECKPOINT")
@@ -151,72 +170,35 @@ function iterate_ra_cem(
 
 end
 
-function bootstrap_estimator(
-    sys::SystemParams, time::TimeProxyAssignment, adequacy::AdequacyProblem,
-    eue_tols::Vector{Float64}; aspp::Bool, endog_risk::Bool
-)
-
-    if aspp
-        time = add_stressperiod(sys, time, adequacy)
-    end
-
-    if endog_risk
-        estimator = EUEEstimator(time, estimators(adequacy, time))
-        length(eue_tols) > 0 && compress_estimator!(estimator, eue_tols)
-    else
-        estimator = nullestimator(sys, time)
-    end
-
-    return estimator
-
-end
-
-function update_estimator(
-    cem::ExpansionProblem, adequacy::AdequacyProblem,
-    old_estimator::EUEEstimator, eue_tols::Vector{Float64};
-    aspp::Bool, endog_risk::Bool
-)
-
-    new_times = if aspp
-        add_stressperiod(cem.system, old_estimator.times, adequacy)
-    else
-        old_estimator.times
-    end
-
-    new_estimator = if endog_risk
-        EUEEstimator(new_times, estimators(cem, adequacy, new_times))
-    else
-        nullestimator(cem.system, new_times)
-    end
-
-    length(eue_tols) > 0 && compress_estimator!(new_estimator, eue_tols)
-
-    return new_estimator
-
-end
-
 function add_stressperiod(
-    sys::SystemParams, times::TimeProxyAssignment, adequacy::AdequacyProblem
+    sys::SystemParams, times::TimeProxyAssignment, adequacy::AdequacyResult;
+    skip_existing::Bool=false
 )
 
-    days = reshape(adequacy.period_eue, times.daylength, :)
+    eues = sum(adequacy.shortfalls.shortfall_mean, dims=1)
+    days = reshape(eues, times.daylength, :)
     days = vec(sum(days, dims=1))
     og_new_day = argmax(days)
 
     new_day = og_new_day
-    new_day_first_hour = (new_day - 1) * 24 + 1
+    new_day_first_hour = (new_day - 1) * times.daylength + 1
 
     while already_included(new_day_first_hour, times.periods)
+
+        skip_existing && return times
+
         new_day = new_day > 1 ? new_day - 1 : length(days)
         new_day_first_hour = (new_day - 1) * times.daylength + 1
+
         if new_day == og_new_day
             @warn("No unmodeled stress periods left to add")
             return times
         end
+
     end
 
     ts = new_day_first_hour:(new_day_first_hour+times.daylength-1)
-    name = string(Date(sys.timesteps[new_day_first_hour])) # TODO
+    name = string(Date(sys.timesteps[new_day_first_hour]))
     new_period = TimePeriod(ts, name)
     println("Adding period: $name")
 
@@ -232,155 +214,123 @@ end
 already_included(hour::Int, periods::Vector{TimePeriod}) =
     any(p -> in(hour, p.timesteps), periods)
 
-function estimators(adequacy::AdequacyProblem, tpa::TimeProxyAssignment)
+function RiskEstimateParams(
+    time::TimeProxyAssignment, results::Vector{AdequacyContext})
 
-    return [
-        period_estimator(adequacy.shortfall_samples, adequacy.surplus_mean, tpa, p)
-        for p in eachindex(tpa.periods)
+    period_params = [
+        RiskEstimatePeriodParams(results, time, p)
+        for p in eachindex(time.periods)
     ]
 
-end
-
-function estimators(
-    cem::ExpansionProblem, adequacy::AdequacyProblem, tpa::TimeProxyAssignment)
-
-    dispatch_periods = [d.period for d in cem.reliabilitydispatch.dispatches]
-
-    result = similar(tpa.periods, PeriodEUEEstimator)
-
-    min_slope = Inf
-    max_slope = -Inf
-
-    for (p, period) in enumerate(tpa.periods)
-
-        dispatch_idx = findfirst(isequal(period), dispatch_periods)
-
-        surplus_mean = if isnothing(dispatch_idx)
-            adequacy.surplus_mean
-        else
-            dispatch = cem.reliabilitydispatch.dispatches[dispatch_idx]
-            value.(dispatch.surplus_mean)
-        end
-
-        result[p] =
-            period_estimator(adequacy.shortfall_samples, surplus_mean, tpa, p)
-
-        for v in result[p].slopes
-            low, hi = extrema(v)
-            low < min_slope && (min_slope = low)
-            hi > max_slope && (max_slope = hi)
-        end
-
-    end
-
-    @show (min_slope, max_slope)
-
-    return result
+    return RiskEstimateParams(time, period_params)
 
 end
 
-function period_estimator(
-    surplus_steps::Array{Float64,3}, surplus_mean::Matrix{Float64},
-    tpa::TimeProxyAssignment, period_idx::Int)
+function RiskEstimatePeriodParams(
+    adequacycontexts::Vector{AdequacyContext},
+    time::TimeProxyAssignment,
+    p::Int
+)
 
-    R, T_fullchrono, n_samples = size(surplus_steps)
-    T_period = tpa.daylength
+    R = length(first(adequacycontexts).thermal_units)
+    T = time.daylength
+    J = length(adequacycontexts)
 
-    size(surplus_mean, 1) == R || error("Region count mismatch")
+    representative_ts = time.periods[p].timesteps
+    represented_ts = represented_timeslices(time, p)
 
-    const_means = size(surplus_mean, 2) == T_period
+    thermalparams = Matrix{Vector{ThermalTechRiskEstimateParams}}(undef, R, T)
+    planes = Array{RiskEstimatePlaneParams,3}(undef, R, T, J)
 
-    const_means || size(surplus_mean, 2) == T_fullchrono ||
-        error("Day length mismatch")
+    for (j, adequacycontext) in enumerate(adequacycontexts)
 
-    period_days = [i for (i, day_assignment) in enumerate(tpa.days)
-                     if day_assignment==period_idx]
+        shortfalls = adequacycontext.adequacy.shortfalls
 
-    eue_ints = Matrix{Vector{Float64}}(undef, R, T_period)
-    eue_slopes = Matrix{Vector{Float64}}(undef, R, T_period)
+        nonthermal_availablecapacity =
+            adequacycontext.variable_availability[:, representative_ts] +
+            adequacycontext.adequacy.storage_offset[:, representative_ts] +
+            adequacycontext.adequacy.transmission_offset[:, representative_ts]
 
-    for r in 1:R, t_period in 1:T_period
+        base_eue = zeros(R,T)
+        nonthermal_dEUE = zeros(R,T)
 
-        steps = Float64[]
+        for ts in represented_ts
+            base_eue .+= shortfalls.shortfall_mean[:, ts] ./ powerunits_MW
+            nonthermal_dEUE .+= shortfalls.eventperiod_regionperiod_mean[:, ts]
+        end
 
-        for day in period_days
+        for r in 1:R
 
-            t = (day-1) * T_period + t_period
-            t_idx = const_means ? t_period : t
+            aggregate_impacts = ThermalRegionAdequacyImpact(
+                adequacycontext.adequacy.thermalimpacts[r], time, p)
 
-            append!(steps, surplus_steps[r, t, :] .+ surplus_mean[r, t_idx])
+            for t in 1:T
+                thermalparams[r,t] = riskparams(
+                    adequacycontext.thermal_units[r],
+                    aggregate_impacts, base_eue, r, t)
+            end
 
         end
 
-        eue_ints[r, t_period], eue_slopes[r, t_period] =
-            estimator_params(steps, n_samples)
+        planes[:,:,j] .= RiskEstimatePlaneParams.(
+            base_eue, nonthermal_availablecapacity,
+            nonthermal_dEUE, thermalparams)
 
     end
 
-    return PeriodEUEEstimator(eue_ints, eue_slopes)
+    return planes
 
 end
 
-function estimator_params(steps::Vector{Float64}, n_samples::Int)
+riskparams(
+    unitcounts::AdequacyModel.ThermalRegionUnitCount,
+    adequacyimpact::ThermalRegionAdequacyImpact,
+    base_eue::Matrix{Float64}, r::Int, t::Int
+) = riskparams.(unitcounts.techs, adequacyimpact.techs, Ref(base_eue), r, t)
 
-    n_steps = length(steps)
+riskparams(
+    unitcounts::AdequacyModel.ThermalTechUnitCount,
+    adequacyimpact::ThermalTechAdequacyImpact,
+    base_eue::Matrix{Float64}, r::Int, t::Int
+) = ThermalTechRiskEstimateParams(
+    riskparams.(unitcounts.sites, adequacyimpact.sites, Ref(base_eue), r, t))
 
-    intercepts = Float64[]
-    slopes = Float64[]
+riskparams(
+    unitcount::AdequacyModel.ThermalSiteUnitCount,
+    adequacyimpact::ThermalSiteAdequacyImpact,
+    base_eue::Matrix{Float64}, r::Int, t::Int
+) = ThermalSiteRiskEstimateParams(unitcount.units, base_eue[r,t] - adequacyimpact.eue[r,t])
 
-    cum_count = 0
-    cum_eue = 0.
-    prev_surplus = Inf
-    prev_slope = 0
+"""
+Collapse a full chronology ThermalRegionAdequacyImpact down into an aggregated
+ThermalRegionAdequacyImpact, for a specific period p from the provided
+TimeProxyAssignment
+"""
+ThermalRegionAdequacyImpact(
+    region::ThermalRegionAdequacyImpact, time::TimeProxyAssignment, p::Int
+) = sum(extract_timeslice(region, ts) for ts in represented_timeslices(time, p))
 
-    for (surplus, count) in unique_steps(round.(Int, steps .* powerunits_MW))
+extract_timeslice(region::ThermalRegionAdequacyImpact, ts::UnitRange{Int}) =
+    ThermalRegionAdequacyImpact(extract_timeslice.(region.techs, Ref(ts)))
 
-        cum_count += count
-        slope = cum_count / n_samples
+extract_timeslice(tech::ThermalTechAdequacyImpact, ts::UnitRange{Int}) =
+    ThermalTechAdequacyImpact(extract_timeslice.(tech.sites, Ref(ts)))
 
-        if !isinf(prev_surplus)
-            cum_eue += prev_slope * (prev_surplus - surplus)
-        end
+extract_timeslice(site::ThermalSiteAdequacyImpact, ts::UnitRange{Int}) =
+    ThermalSiteAdequacyImpact(site.eue[:, ts])
 
-        push!(slopes, slope)
-        push!(intercepts, (cum_eue + slope * surplus) / powerunits_MW)
++(s1::ThermalRegionAdequacyImpact, s2::ThermalRegionAdequacyImpact) =
+    ThermalRegionAdequacyImpact(s1.techs + s2.techs)
 
-        prev_surplus = surplus
-        prev_slope = slope
++(s1::ThermalTechAdequacyImpact, s2::ThermalTechAdequacyImpact) =
+    ThermalTechAdequacyImpact(s1.sites + s2.sites)
 
-    end
++(s1::ThermalSiteAdequacyImpact, s2::ThermalSiteAdequacyImpact) =
+    ThermalSiteAdequacyImpact(s1.eue + s2.eue)
 
-    # These aren't mathematically necessary, but JuMP complains when iterating
-    # over an empty set of constraints
-    if iszero(length(slopes))
-        push!(slopes, 0)
-        push!(intercepts, 0)
-    end
-
-    return intercepts, slopes
-
-end
-
-function unique_steps(steps::Vector{Int})
-
-    d = Dict{Int,Int}()
-    result = Pair{Int,Int}[]
-
-    for s in steps
-        s <= 0 && continue
-        if s in keys(d)
-            d[s] += 1
-        else
-            d[s] = 1
-        end
-    end
-
-    for s in sort(collect(keys(d)), rev=true)
-        push!(result, s => d[s])
-    end
-
-    return result
-
+function represented_timeslices(time::TimeProxyAssignment, p::Int)
+    T = time.daylength
+    return [((d-1)*T+1):(d*T) for d in findall(isequal(p), time.days)]
 end
 
 end

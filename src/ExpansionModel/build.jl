@@ -32,6 +32,9 @@ function warmstart_builds!(build::ThermalSiteExpansion, prev_build::ThermalSiteE
     return
 end
 
+ThermalSiteUnitCount(site::ThermalSiteExpansion) =
+    ThermalSiteUnitCount(site.params.units_existing + round(Int, value(site.units_new)))
+
 struct VariableSiteExpansion <: VariableSite
 
     params::VariableSiteParams

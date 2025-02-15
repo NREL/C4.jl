@@ -32,7 +32,7 @@ function DuckDB.close(appender::AdequacyAppender)
     return
 end
 
-function store(con::DBInterface.Connection, iter::Int, result::AdequacyProblem)
+function store(con::DBInterface.Connection, iter::Int, result::AdequacyResult)
 
     DBInterface.execute(con, "CREATE TABLE IF NOT EXISTS adequacies (
         iteration INTEGER PRIMARY KEY REFERENCES iterations(id),
@@ -56,26 +56,32 @@ function store(con::DBInterface.Connection, iter::Int, result::AdequacyProblem)
 
     appender = AdequacyAppender(con)
 
-    region_names = result.prassys.regions.names
-    region_demands = vec(sum(result.prassys.regions.load, dims=2))
+    region_names = result.shortfalls.regions.names
+    region_demands = vec(sum(result.shortfalls.regions.load, dims=2))
+
+    eue = EUE(result.shortfalls)
+    lole = LOLE(result.shortfalls)
 
     DuckDB.append(appender.adequacies, iter)
     DuckDB.append(appender.adequacies, sum(region_demands))
-    DuckDB.append(appender.adequacies, result.eue * powerunits_MW)
-    DuckDB.append(appender.adequacies, result.eue_std * powerunits_MW)
-    DuckDB.append(appender.adequacies, result.lole)
-    DuckDB.append(appender.adequacies, result.lole_std)
+    DuckDB.append(appender.adequacies, val(eue))
+    DuckDB.append(appender.adequacies, stderror(eue))
+    DuckDB.append(appender.adequacies, val(lole))
+    DuckDB.append(appender.adequacies, stderror(lole))
     DuckDB.end_row(appender.adequacies)
 
-    for r in 1:length(region_names)
+    for (r, regionname) in enumerate(region_names)
+
+        eue = PRAS.EUE(result.shortfalls, regionname)
+        lole = PRAS.LOLE(result.shortfalls, regionname)
 
         DuckDB.append(appender.region_adequacies, iter)
-        DuckDB.append(appender.region_adequacies, region_names[r])
+        DuckDB.append(appender.region_adequacies, regionname)
         DuckDB.append(appender.region_adequacies, region_demands[r])
-        DuckDB.append(appender.region_adequacies, result.region_eues[r] * powerunits_MW)
-        DuckDB.append(appender.region_adequacies, result.region_eue_stds[r] * powerunits_MW)
-        DuckDB.append(appender.region_adequacies, result.region_loles[r])
-        DuckDB.append(appender.region_adequacies, result.region_lole_stds[r])
+        DuckDB.append(appender.region_adequacies, PRAS.val(eue))
+        DuckDB.append(appender.region_adequacies, PRAS.stderror(eue))
+        DuckDB.append(appender.region_adequacies, PRAS.val(lole))
+        DuckDB.append(appender.region_adequacies, PRAS.stderror(lole))
         DuckDB.end_row(appender.region_adequacies)
 
     end

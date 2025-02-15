@@ -15,7 +15,6 @@ import HiGHS
 import JuMP: optimizer_with_attributes, value, termination_status, write_to_file
 
 include("DispatchModel/sequencing.jl")
-include("IterationModel/eue_estimator.jl")
 
 optimizer = optimizer_with_attributes(
     HiGHS.Optimizer,
@@ -23,6 +22,7 @@ optimizer = optimizer_with_attributes(
 )
 
 sys = SystemParams("Data/toysystem")
+n_regions = length(sys.regions)
 display(sys)
 
 timestamp = Dates.format(now(), "yyyymmddHHMMSS")
@@ -33,13 +33,16 @@ repeatedchrono = singleperiod(sys, daylength=2)
 max_eues = zeros(3)
 
 ram = AdequacyProblem(sys, samples=1000)
-solve!(ram)
-println("NEUE: ", ram.region_neue)
+ram_results = solve(ram)
+println("Base reliability:")
+show_neues(ram_results)
 
-cem = ExpansionProblem(sys, nullestimator(sys, repeatedchrono), max_eues, optimizer)
+# Formulate and solve a one-off CEM without risk curves
+
+cem = ExpansionProblem(sys, nullestimator(repeatedchrono, n_regions), max_eues, optimizer)
 write_to_file(cem.model, "model.lp")
 
-cem = ExpansionProblem(sys, nullestimator(sys, fullchrono), max_eues, optimizer)
+cem = ExpansionProblem(sys, nullestimator(fullchrono, n_regions), max_eues, optimizer)
 solve!(cem)
 
 println("System Cost: ", value(cost(cem)))
@@ -49,8 +52,9 @@ sys_built = SystemParams(cem)
 display(sys_built)
 
 ram = AdequacyProblem(sys_built, samples=1000)
-solve!(ram)
-println("NEUE: ", ram.region_neue)
+ram_results = solve(ram)
+println("One-shot CEM reliability without risk curves:")
+show_neues(ram_results)
 
 pcm = DispatchProblem(sys_built, ReliabilityDispatch, fullchrono, optimizer)
 solve!(pcm)
@@ -64,17 +68,44 @@ pcm_end = now()
 println(termination_status(pcm.model))
 println("Operating Cost (Economic): ", value(cost(pcm)))
 
-max_neues = ones(3)
-neue_tols = fill(0.1, 3)
-cem, ram, pcm = iterate_ra_cem(
-    sys, fullchrono, max_neues, optimizer,
-    neue_tols=neue_tols, outfile=timestamp * ".db", check_dispatch=true)
+# Formulate and solve a one-off CEM with risk curves
+
+ram = AdequacyProblem(sys, samples=1000)
+ram_results = solve(ram)
+curve_data = [AdequacyContext(sys, ram_results)]
+curve_params = ExpansionModel.RiskEstimateParams(repeatedchrono, curve_data)
+cem = ExpansionProblem(sys, curve_params, max_eues, optimizer)
+write_to_file(cem.model, "model_riskcurves.lp")
+solve!(cem)
+
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
-println("NEUE: ", ram.region_neue)
 
 sys_built = SystemParams(cem)
 display(sys_built)
+
+ram = AdequacyProblem(sys_built, samples=1000)
+ram_results = solve(ram)
+println("One-shot CEM reliability with risk curves:")
+show_neues(ram_results) # TODO: Why isn't this system more reliable than the first?
+
+# Formulate and solve an iterative RA-CEM feedback loop
+
+max_neues = ones(3)
+cem, ram, pcm = iterate_ra_cem(
+    sys, fullchrono, max_neues, optimizer,
+    outfile=timestamp * ".db", check_dispatch=true)
+println("System Cost: ", value(cost(cem)))
+println("System LCOE: ", value(lcoe(cem)))
+
+sys_built = SystemParams(cem)
+display(sys_built)
+
+ram = AdequacyProblem(sys_built, samples=1000)
+ram_results = solve(ram)
+println("Iterative CEM reliability:")
+show_neues(ram_results)
+
 
 pcm = DispatchProblem(sys_built, ReliabilityDispatch, fullchrono, optimizer)
 solve!(pcm)

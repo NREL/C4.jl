@@ -3,21 +3,28 @@ module ExpansionModel
 import JuMP
 import JuMP: @variable, @constraint, @expression, @objective, value
 
-import ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
-       ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
-       ..Interface, ..Region, ..System, ..varnames!,
-       ..availablecapacity, ..maxpower, ..maxenergy,
-       ..roundtrip_efficiency, ..operating_cost,
-       ..name, ..cost, ..cost_generation, ..region_from, ..region_to,
-       ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
+import  ..JuMP_GreaterThanConstraintRef, ..JuMP_LessThanConstraintRef,
+        ..JuMP_ExpressionRef,
+        ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
+        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
+        ..Interface, ..Region, ..System, ..varnames!,
+        ..availablecapacity, ..maxpower, ..maxenergy,
+        ..roundtrip_efficiency, ..operating_cost,
+        ..name, ..cost, ..cost_generation, ..region_from, ..region_to,
+        ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
 
 using ..Data
+using ..AdequacyModel
 using ..DispatchModel
 
+import ..AdequacyModel: AdequacyContext,
+                        ThermalRegionUnitCount, ThermalSiteUnitCount
+
 include("build.jl")
+include("riskestimates.jl")
 
 export ExpansionProblem, warmstart_builds!, solve!,
-       capex, opex, cost, lcoe
+       capex, opex, cost, lcoe, nullestimator
 
 const ExpansionEconomicDispatch =
     DispatchSequence{EconomicDispatch{SystemExpansion,RegionExpansion,InterfaceExpansion}}
@@ -40,14 +47,14 @@ mutable struct ExpansionProblem
 
     function ExpansionProblem(
         system::SystemParams,
-        eue_estimator::EUEEstimator,
+        riskparams::RiskEstimateParams,
         eue_max::Vector{Float64}, # in powerunits_MWh
         optimizer)
 
         n_timesteps = length(system.timesteps)
         n_regions = length(system.regions)
 
-        timestepcount(eue_estimator.times) == n_timesteps ||
+        timestepcount(riskparams.times) == n_timesteps ||
             error("Time period assignment is incompatible with system timesteps")
 
         length(eue_max) == n_regions ||
@@ -60,13 +67,13 @@ mutable struct ExpansionProblem
             [InterfaceExpansion(m, i) for i in system.interfaces])
 
         economicdispatch = DispatchSequence(
-            EconomicDispatch, m, builds, eue_estimator.times)
+            EconomicDispatch, m, builds, riskparams.times)
 
         reliabilitydispatch = DispatchSequence(
-            ReliabilityDispatch, m, builds, eue_estimator.times)
+            ReliabilityDispatch, m, builds, riskparams.times)
 
         reliabilityconstraints = ReliabilityConstraints(
-            m, builds, reliabilitydispatch.dispatches, eue_estimator, eue_max)
+            m, builds, reliabilitydispatch.dispatches, riskparams, eue_max)
 
         opex_scalar = 8766 / n_timesteps
 
@@ -80,8 +87,14 @@ mutable struct ExpansionProblem
 end
 
 function solve!(prob::ExpansionProblem)
+
     flush(stdout)
+
     JuMP.optimize!(prob.model)
+
+    JuMP.termination_status(prob.model) == JuMP.OPTIMAL ||
+        @error "Problem did not solve to optimality"
+
 end
 
 # Capex is annualized, so scale opex to approximate an annual cost
@@ -114,6 +127,30 @@ function warmstart_builds!(prob::ExpansionProblem, prev_prob::ExpansionProblem)
     warmstart_builds!.(prob.builds.interfaces, prev_prob.builds.interfaces)
     return
 end
+
+function AdequacyContext(
+    cem::ExpansionProblem, adequacy::AdequacyResult
+)
+
+    R, T = size(adequacy.load)
+
+    variable_availability = zeros(Float64, R, T)
+    for (r, region) in enumerate(cem.builds.regions)
+        for tech in region.variabletechs
+            for site in tech.sites
+                capacity = site.params.capacity_existing + value(site.capacity_new)
+                variable_availability[r,:] .+= capacity .* site.params.availability
+            end
+        end
+    end
+
+    thermal_units = [ThermalRegionUnitCount(region) for region in cem.builds.regions]
+
+    return AdequacyContext(
+        variable_availability, thermal_units, adequacy)
+
+end
+
 
 include("export.jl")
 
