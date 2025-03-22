@@ -247,10 +247,14 @@ function load_storagetechs!(system::SystemParams, datadir::String)
         cost_capital_energy = Float64(techs[r, 4]) * powerunits_MW
         cost_operation = Float64(techs[r, 5]) * powerunits_MW
         roundtrip_efficiency = Float64(techs[r, 6])
+        duration = Float64(techs[r, 7])
+
+        # Collapse power and energy costs into fixed-duration power cost
+        cost_capital_power += duration * cost_capital_energy
 
         tech = StorageParams(
-            techname, cost_capital_power, cost_capital_energy, cost_operation,
-            roundtrip_efficiency, StorageSiteParams[])
+            techname, cost_capital_power, cost_operation,
+            roundtrip_efficiency, duration, StorageSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
         push!(region.storagetechs, tech)
@@ -279,14 +283,14 @@ function load_storagesites!(system::SystemParams, datadir::String)
         power_existing = Float64(sites[r, 4]) / powerunits_MW
         power_new_max = Float64(sites[r, 5]) / powerunits_MW
 
-        energy_existing = Float64(sites[r, 6]) / powerunits_MW
-        energy_new_max = Float64(sites[r, 7]) / powerunits_MW
-
-        site = StorageSiteParams(
-            sitename, power_existing, power_new_max,
-            energy_existing, energy_new_max)
+        # energy_existing = Float64(sites[r, 6]) / powerunits_MW
+        # energy_new_max = Float64(sites[r, 7]) / powerunits_MW
 
         tech = get_tech(system, StorageParams, regionname, techname)
+
+        site = StorageSiteParams(
+            sitename, power_existing, power_new_max, tech)
+
         push!(tech.sites, site)
 
     end

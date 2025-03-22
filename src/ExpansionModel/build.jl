@@ -72,7 +72,6 @@ struct StorageSiteExpansion <: StorageSite
 
     params::StorageSiteParams
     power_new::JuMP.VariableRef
-    energy_new::JuMP.VariableRef
 
     function StorageSiteExpansion(
         m::JuMP.Model, siteparams::StorageSiteParams,
@@ -84,10 +83,7 @@ struct StorageSiteExpansion <: StorageSite
         power_new = @variable(m, lower_bound=0, upper_bound=siteparams.power_new_max)
         JuMP.set_name(power_new, "storage_new_power[$fullname]")
 
-        energy_new = @variable(m, lower_bound=0, upper_bound=siteparams.energy_new_max)
-        JuMP.set_name(energy_new, "storage_new_energy[$fullname]")
-
-        new(siteparams, power_new, energy_new)
+        new(siteparams, power_new)
 
     end
 
@@ -97,23 +93,20 @@ maxpower(build::StorageSiteExpansion) =
     build.params.power_existing + build.power_new
 
 maxenergy(build::StorageSiteExpansion) =
-    build.params.energy_existing + build.energy_new
+    maxpower(build) * build.params.tech.duration
 
 function StorageSiteParams(build::StorageSiteExpansion)
     site = build.params
     new_power = value(build.power_new)
-    new_energy = value(build.energy_new)
     return StorageSiteParams(
         site.name,
         site.power_existing + new_power,
         site.power_new_max - new_power,
-        site.energy_existing + new_energy,
-        site.energy_new_max - new_energy)
+        site.tech)
 end
 
 function warmstart_builds!(build::StorageSiteExpansion, prev_build::StorageSiteExpansion)
     JuMP.set_start_value(build.power_new, value(prev_build.power_new))
-    JuMP.set_start_value(build.energy_new, value(prev_build.energy_new))
     return
 end
 
@@ -222,12 +215,10 @@ end
 maxpower(build::StorageExpansion) = sum(
     site.params.power_existing + site.power_new for site in build.sites; init=0)
 
-maxenergy(build::StorageExpansion) = sum(
-    site.params.energy_existing + site.energy_new for site in build.sites; init=0)
+maxenergy(build::StorageExpansion) = maxpower(build) * build.params.duration
 
 cost(build::StorageExpansion) =
-    sum(site.power_new for site in build.sites; init=0) * build.params.cost_capital_power +
-    sum(site.energy_new for site in build.sites; init=0) * build.params.cost_capital_energy
+    sum(site.power_new for site in build.sites; init=0) * build.params.cost_capital_power
 
 operating_cost(build::StorageExpansion) = operating_cost(build.params)
 
@@ -237,8 +228,8 @@ function StorageParams(build::StorageExpansion)
     storage = build.params
     return StorageParams(
         storage.name,
-        storage.cost_capital_power, storage.cost_capital_energy,
-        storage.cost_operation, storage.roundtrip_efficiency,
+        storage.cost_capital_power, storage.cost_operation,
+        storage.roundtrip_efficiency, storage.duration,
         StorageSiteParams.(build.sites))
 end
 

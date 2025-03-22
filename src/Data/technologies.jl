@@ -51,10 +51,10 @@ struct StorageParams <: StorageTechnology{StorageSiteParams}
     name::String
 
     cost_capital_power::Float64 # annualized $/MW
-    cost_capital_energy::Float64 # annualized $/MWh
     cost_operation::Float64 # $/MWh
 
     roundtrip_efficiency::Float64
+    duration::Float64 # hours
 
     sites::Vector{StorageSiteParams}
 
@@ -64,7 +64,7 @@ powerrating(tech::StorageParams) =
     sum(site.power_existing for site in tech.sites; init=0)
 
 energyrating(tech::StorageParams) =
-    sum(site.energy_existing for site in tech.sites; init=0)
+    powerrating(tech) * tech.duration
 
 roundtrip_efficiency(tech::StorageParams) = tech.roundtrip_efficiency
 

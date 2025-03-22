@@ -166,12 +166,12 @@ function load_storages(sys::SystemParams, meta)
             efficiency = sqrt(tech.roundtrip_efficiency)
             for site in tech.sites
                 sitename = join([region.name, tech.name, site.name], "_")
-                if site.power_existing > 0 && site.energy_existing > 0
+                if site.power_existing > 0
                     s_last += 1
                     names[s_last] = sitename
                     categories[s_last] = tech.name
                     power_capacity[s_last, :] .= round(Int, site.power_existing .* powerunits_MW)
-                    energy_capacity[s_last, :] .= round(Int, site.energy_existing .* powerunits_MW)
+                    energy_capacity[s_last, :] .= tech.duration .* power_capacity[s_last, :]
                     oneway_efficiency[s_last, :] .= efficiency
                 end
             end
@@ -195,7 +195,7 @@ function count_stors(sys::SystemParams)
     for region in sys.regions
         for tech in region.storagetechs
             for site in tech.sites
-                if site.power_existing > 0 && site.energy_existing > 0
+                if site.power_existing > 0
                     n_stors += 1
                 end
             end

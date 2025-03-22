@@ -43,13 +43,16 @@ struct StorageSiteParams <: StorageSite
     power_existing::Float64
     power_new_max::Float64
 
-    energy_existing::Float64
-    energy_new_max::Float64
+    # The asymmetry with other resource types isn't great,
+    # nor is the abstract typing (needed because StorageParams
+    # isn't defined yet and has a circular dependency with this type),
+    # but it's good enough for this ephemeral branch
+    tech::StorageTechnology{StorageSiteParams}
 
 end
 
 maxpower(site::StorageSiteParams) = site.power_existing
-maxenergy(site::StorageSiteParams) = site.energy_existing
+maxenergy(site::StorageSiteParams) = maxpower(site) * site.tech.duration
 
 const SiteParams = Union{GeneratorSiteParams,StorageSiteParams}
 name(site::SiteParams) = site.name
