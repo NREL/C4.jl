@@ -9,8 +9,6 @@ using C4.IterationModel
 
 import C4: store, powerunits_MW
 
-using DuckDB
-
 import HiGHS
 import JuMP: optimizer_with_attributes, value, termination_status, write_to_file
 
@@ -184,3 +182,5 @@ println("Operating Cost (Reliability): ", value(cost(pcm)))
 pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer, voll)
 solve!(pcm)
 println("Operating Cost (Economic): ", value(cost(pcm)))
+
+include("CapacityCreditExpansionProblem.jl")

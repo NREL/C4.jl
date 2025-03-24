@@ -1,0 +1,56 @@
+using DBInterface
+using DuckDB
+
+using C4.CapacityCreditExpansionModel
+
+sys = SystemParams("Data/toysystem-coppersheet")
+display(sys)
+
+peak_load = maximum(sys.regions[1].demand)
+
+# Here we just hardcode things because the numbers are all made up anyways.
+# A more robust solution would be to iterate through
+# sys.region[1].variabletechs, extract each technology's name, and match
+# it with CC data stored somewhere else.
+
+cc_1d = CapacityCreditCurvesParams(
+    [0.9, 0.9], # Gas CT and Gas CC static capacity credits
+    [
+        # Wind (Variable Tech #1)
+        CapacityCreditCurveParams(150., [0., 50, 75]), 
+        # Solar PV (Variable Tech #2)
+        CapacityCreditCurveParams(100., [0., 50, 80, 100])
+    ], [
+        # 4h Lithium Ion (Storage Tech #1)
+        CapacityCreditCurveParams(10., [0., 5, 8,])
+    ])
+
+cc_cem = CapacityCreditExpansionProblem(sys, fullchrono, cc_1d, peak_load, optimizer)
+write_to_file(cc_cem.model, "model_cc.lp")
+
+cc_start = now()
+solve!(cc_cem)
+cc_end = now()
+
+con = DBInterface.connect(DuckDB.DB, timestamp * "_cc_1d.db")
+store(con, cc_cem, cc_start => cc_end)
+
+println("System Cost: ", value(cost(cc_cem)))
+println("System LCOE: ", value(lcoe(cc_cem)))
+
+sys_built = SystemParams(cc_cem)
+display(sys_built)
+
+for prm in 0:0.1:0.5
+
+    # Note that for testing purposes, this *ignores* any EFC contributions
+    # of existing generators, which you wouldn't want to do in reality
+
+    build_efc = peak_load * (1 + prm)
+
+    local cc_cem = CapacityCreditExpansionProblem(sys, fullchrono, cc_1d, build_efc, optimizer)
+    solve!(cc_cem)
+
+    println("System Cost @ PRM = $(prm): ", value(cost(cc_cem)))
+
+end

@@ -5,7 +5,7 @@ import Dates: DateTime
 import ..store, ..powerunits_MW
 
 function store(
-    con::DBInterface.Connection, cem::ExpansionProblem,
+    con::DBInterface.Connection, cem::AbstractExpansionProblem,
     timings::Pair{DateTime,DateTime}; iter::Int=0)
 
     store(con, cem.system)

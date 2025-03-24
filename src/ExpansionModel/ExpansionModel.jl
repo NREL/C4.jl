@@ -29,7 +29,9 @@ const ExpansionEconomicDispatch =
 const ExpansionReliabilityDispatch =
     DispatchSequence{ReliabilityDispatch{SystemExpansion,RegionExpansion,InterfaceExpansion}}
 
-mutable struct ExpansionProblem
+abstract type AbstractExpansionProblem end
+
+mutable struct ExpansionProblem <: AbstractExpansionProblem
 
     model::JuMP.Model
 
@@ -83,7 +85,7 @@ mutable struct ExpansionProblem
 
 end
 
-function solve!(prob::ExpansionProblem)
+function solve!(prob::AbstractExpansionProblem)
 
     flush(stdout)
 
@@ -95,13 +97,13 @@ function solve!(prob::ExpansionProblem)
 end
 
 # Capex is annualized, so scale opex to approximate an annual cost
-opex(prob::ExpansionProblem) =
+opex(prob::AbstractExpansionProblem) =
     8766 / length(prob.system.timesteps) * cost(prob.economicdispatch)
 
-capex(prob::ExpansionProblem) = cost(prob.builds)
-cost(prob::ExpansionProblem) = capex(prob) + opex(prob)
+capex(prob::AbstractExpansionProblem) = cost(prob.builds)
+cost(prob::AbstractExpansionProblem) = capex(prob) + opex(prob)
 
-function lcoe(prob::ExpansionProblem)
+function lcoe(prob::AbstractExpansionProblem)
 
     # Scale demand to an approximate annual value to compare to annualized costs
     demand_scaler = 8766 / length(prob.system.timesteps)
@@ -114,7 +116,7 @@ function lcoe(prob::ExpansionProblem)
 
 end
 
-SystemParams(prob::ExpansionProblem) = SystemParams(
+SystemParams(prob::AbstractExpansionProblem) = SystemParams(
     prob.system.name, prob.system.timesteps,
     RegionParams.(prob.builds.regions), InterfaceParams.(prob.builds.interfaces)
 )

@@ -19,5 +19,6 @@ include("AdequacyModel/AdequacyModel.jl")
 include("DispatchModel/DispatchModel.jl")
 include("ExpansionModel/ExpansionModel.jl")
 include("IterationModel/IterationModel.jl")
+include("CapacityCreditExpansionModel/CapacityCreditExpansionModel.jl")
 
 end
