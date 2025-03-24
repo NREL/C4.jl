@@ -7,10 +7,12 @@ import ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System, ..varnames!,
        ..JuMP_LessThanConstraintRef, ..JuMP_GreaterThanConstraintRef,
+       ..JuMP_ExpressionRef,
        ..availablecapacity, ..maxpower, ..maxenergy,
        ..roundtrip_efficiency, ..operating_cost,
        ..name, ..cost, ..cost_generation, ..region_from, ..region_to,
-       ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
+       ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!,
+       ..powerunits_MW
 
 using ..Data
 using ..DispatchModel
@@ -34,9 +36,11 @@ new_nameplate(build::ExpansionModel.StorageExpansion) = sum(
     site.power_new for site in build.sites; init=0)
 
 include("1d_curves.jl")
+include("nd_surface.jl")
 
 export CapacityCreditExpansionProblem,
-       CapacityCreditCurveParams, CapacityCreditCurvesParams
+       CapacityCreditCurveParams, CapacityCreditCurvesParams,
+       CapacityCreditSurfaceParams
 
 mutable struct CapacityCreditExpansionProblem{T <: CapacityCreditFormulation} <: ExpansionModel.AbstractExpansionProblem
 
@@ -54,7 +58,7 @@ mutable struct CapacityCreditExpansionProblem{T <: CapacityCreditFormulation} <:
         system::SystemParams,
         chronology::TimeProxyAssignment,
         capacitycredits::CapacityCreditParams,
-        build_efc::Float64, # powerunits_MW
+        build_efc::Float64, # MW
         optimizer)
 
         n_timesteps = length(system.timesteps)

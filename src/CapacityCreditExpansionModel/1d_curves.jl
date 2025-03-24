@@ -1,7 +1,7 @@
 struct CapacityCreditCurveParams
 
-    stepsize::Float64 # powerunits_MW nameplate
-    points::Vector{Float64} # powerunits_MW EFC
+    stepsize::Float64 # MW nameplate
+    points::Vector{Float64} # MW EFC
 
     function CapacityCreditCurveParams(stepsize::Float64, points::Vector{Float64})
         stepsize > 0 || error("Step size must be positive")
@@ -29,9 +29,9 @@ function capacity_credits(
 
     n_segments = length(cc.points)
 
-    cc_nameplate(s::Int) = (s-1) * cc.stepsize
+    cc_nameplate(s::Int) = (s-1) * cc.stepsize / powerunits_MW
 
-    cc_slope(s::Int) = if s == 1 
+    cc_slope(s::Int) = if s == 1
         (cc.points[s+1] - cc.points[s]) / cc.stepsize
     elseif s == n_segments
         (cc.points[s] - cc.points[s-1]) / cc.stepsize
@@ -40,7 +40,7 @@ function capacity_credits(
     end
 
     efc_constraints = @constraint(m, [s in 1:n_segments],
-        efc <= cc.points[s] +
+        efc <= cc.points[s] / powerunits_MW +
                 (new_nameplate(build) - cc_nameplate(s)) * cc_slope(s)
     )
 
@@ -107,7 +107,7 @@ function capacity_credits(
     ]
 
     prm = @constraint(m,
-        thermal_efc + sum(variable_efcs) + sum(storage_efcs) >= build_efc)
+        thermal_efc + sum(variable_efcs) + sum(storage_efcs) >= build_efc / powerunits_MW)
 
     return CapacityCreditCurves(
         variable_efcs, variable_curves,
