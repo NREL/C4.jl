@@ -93,14 +93,13 @@ end
 function store(appender::ExpansionAppender, iter::Int, site::ThermalSiteExpansion,
                tech::ThermalExpansion, region::RegionExpansion)
 
-    total_units = value(site.units_new) + site.params.units_existing 
-    total_capacity = total_units * tech.params.unit_size * powerunits_MW
+    new_capacity = value(site.units_new) * tech.params.unit_size * powerunits_MW
 
     DuckDB.append(appender.sitebuilds, iter)
     DuckDB.append(appender.sitebuilds, name(site))
     DuckDB.append(appender.sitebuilds, name(tech))
     DuckDB.append(appender.sitebuilds, name(region))
-    DuckDB.append(appender.sitebuilds, total_capacity)
+    DuckDB.append(appender.sitebuilds, new_capacity)
     DuckDB.append(appender.sitebuilds, nothing)
     DuckDB.end_row(appender.sitebuilds)
 
@@ -109,8 +108,7 @@ end
 function store(appender::ExpansionAppender, iter::Int, site::VariableSiteExpansion,
                tech::VariableExpansion, region::RegionExpansion)
 
-    total_capacity = powerunits_MW *
-        (value(site.capacity_new) + site.params.capacity_existing)
+    total_capacity = value(site.capacity_new) * powerunits_MW
 
     DuckDB.append(appender.sitebuilds, iter)
     DuckDB.append(appender.sitebuilds, name(site))
@@ -125,15 +123,15 @@ end
 function store(appender::ExpansionAppender, iter::Int, site::StorageSiteExpansion,
                tech::StorageExpansion, region::RegionExpansion)
 
-    total_power = value(maxpower(site)) * powerunits_MW
-    total_energy = value(maxenergy(site)) * powerunits_MW
+    new_power = value(site.power_new) * powerunits_MW
+    new_energy = value(site.energy_new) * powerunits_MW
 
     DuckDB.append(appender.sitebuilds, iter)
     DuckDB.append(appender.sitebuilds, name(site))
     DuckDB.append(appender.sitebuilds, name(tech))
     DuckDB.append(appender.sitebuilds, name(region))
-    DuckDB.append(appender.sitebuilds, total_power)
-    DuckDB.append(appender.sitebuilds, total_energy)
+    DuckDB.append(appender.sitebuilds, new_power)
+    DuckDB.append(appender.sitebuilds, new_energy)
     DuckDB.end_row(appender.sitebuilds)
 
 end
@@ -144,12 +142,12 @@ function store(appender::ExpansionAppender, iter::Int,
     region_from = name(regions[iface.params.region_from])
     region_to = name(regions[iface.params.region_to])
 
-    total_capacity = value(availablecapacity(iface)) * powerunits_MW
+    new_capacity = value(iface.capacity_new) * powerunits_MW
 
     DuckDB.append(appender.interfacebuilds, iter)
     DuckDB.append(appender.interfacebuilds, region_from)
     DuckDB.append(appender.interfacebuilds, region_to)
-    DuckDB.append(appender.interfacebuilds, total_capacity)
+    DuckDB.append(appender.interfacebuilds, new_capacity)
     DuckDB.end_row(appender.interfacebuilds)
 
 end
