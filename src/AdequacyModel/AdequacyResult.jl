@@ -31,7 +31,7 @@ struct ThermalTechAdequacyImpact
 end
 
 function ThermalTechAdequacyImpact(tech::ThermalParams, prob::AdequacyProblem, r::Int)
-    unitsize = round(Int, tech.unit_size)
+    unitsize = round(Int, tech.unit_size * powerunits_MW)
     return ThermalTechAdequacyImpact([
         ThermalSiteAdequacyImpact(site, prob, r, unitsize)
         for site in tech.sites])
@@ -46,13 +46,6 @@ ThermalRegionAdequacyImpact(region::RegionParams, prob::AdequacyProblem, r::Int)
         ThermalTechAdequacyImpact(tech, prob, r) for tech in region.thermaltechs])
 
 struct AdequacyResult
-
-    # TODO: Since PRAS v0.7.1 this is redundant with shortfalls.regions.load, can be eliminated
-    load::Matrix{Float64} # RxT demand
-
-    # Positive is a net power injection into the region, negative is a net withdrawal
-    storage_offset::Matrix{Float64} # RxT
-    transmission_offset::Matrix{Float64} # RxT
 
     shortfalls::PRAS.PRASCore.Results.ShortfallResult
 
@@ -77,30 +70,13 @@ region_neues(result::AdequacyResult) =
 function solve(prob::AdequacyProblem)
 
     simspec = SequentialMonteCarlo(samples=prob.samples, seed=1)
+    sf, = assess(prob.prassys, simspec, Shortfall())
 
-    sf, fl, se = assess(prob.prassys, simspec, Shortfall(), Flow(), StorageEnergy())
-
-    R = length(prob.prassys.regions)
-    T = length(prob.prassys.timestamps)
-    n_stors = length(prob.prassys.storages)
-
-    net_stor_discharge = -diff([zeros(n_stors) se.energy_mean], dims=2) ./ powerunits_MW
-    region_net_stor_discharge = aggregate(net_stor_discharge, prob.prassys.region_stor_idxs)
-
-    region_net_import = zeros(Float64, R, T)
-    for (i, (from, to)) in enumerate(zip(
-            prob.prassys.interfaces.regions_from, prob.prassys.interfaces.regions_to))
-        region_net_import[from, :] .-= fl.flow_mean[i, :] ./ powerunits_MW
-        region_net_import[to, :] .+= fl.flow_mean[i, :] ./ powerunits_MW
-    end
-
+    # TODO: Make this optional
     thermalimpacts = [ThermalRegionAdequacyImpact(region, prob, r)
                  for (r, region) in enumerate(prob.sys.regions)]
 
-    return AdequacyResult(
-        prob.prassys.regions.load ./ powerunits_MW,
-        region_net_stor_discharge, region_net_import,
-        sf, thermalimpacts)
+    return AdequacyResult(sf, thermalimpacts)
 
 end
 

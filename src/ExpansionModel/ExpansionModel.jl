@@ -17,13 +17,10 @@ using ..Data
 using ..AdequacyModel
 using ..DispatchModel
 
-import ..AdequacyModel: AdequacyContext,
-                        ThermalRegionUnitCount, ThermalSiteUnitCount
-
 include("build.jl")
 include("riskestimates.jl")
 
-export ExpansionProblem, warmstart_builds!, solve!,
+export ExpansionProblem, ExpansionAdequacyContext, warmstart_builds!, solve!,
        capex, opex, cost, lcoe, nullestimator
 
 const ExpansionEconomicDispatch =
@@ -128,30 +125,8 @@ function warmstart_builds!(prob::ExpansionProblem, prev_prob::ExpansionProblem)
     return
 end
 
-function AdequacyContext(
-    cem::ExpansionProblem, adequacy::AdequacyResult
-)
 
-    R, T = size(adequacy.load)
-
-    variable_availability = zeros(Float64, R, T)
-    for (r, region) in enumerate(cem.builds.regions)
-        for tech in region.variabletechs
-            for site in tech.sites
-                capacity = site.params.capacity_existing + value(site.capacity_new)
-                variable_availability[r,:] .+= capacity .* site.params.availability
-            end
-        end
-    end
-
-    thermal_units = [ThermalRegionUnitCount(region) for region in cem.builds.regions]
-
-    return AdequacyContext(
-        variable_availability, thermal_units, adequacy)
-
-end
-
-
+include("ExpansionAdequacyContext.jl")
 include("export.jl")
 
 end

@@ -8,10 +8,13 @@ using C4.ExpansionModel
 import ..store, ..powerunits_MW
 import C4.ExpansionModel: RiskEstimateParams, RiskEstimatePeriodParams,
                           RiskEstimatePlaneParams, ThermalTechRiskEstimateParams,
-                          ThermalSiteRiskEstimateParams
-import C4.AdequacyModel: ThermalRegionUnitCount, ThermalRegionAdequacyImpact,
-                         ThermalTechUnitCount, ThermalTechAdequacyImpact,
-                         ThermalSiteUnitCount, ThermalSiteAdequacyImpact
+                          ThermalSiteRiskEstimateParams,
+                          ThermalRegionUnitCount, ThermalTechUnitCount,
+                          ThermalSiteUnitCount
+
+import C4.AdequacyModel: ThermalRegionAdequacyImpact,
+                         ThermalTechAdequacyImpact,
+                         ThermalSiteAdequacyImpact
 
 import Base: +
 import Dates: Date, now
@@ -40,12 +43,9 @@ function iterate_ra_cem(
 
     n_regions = length(sys.regions)
 
-    adequacy_results = AdequacyContext[]
-
     ram_start = now()
     ram = AdequacyProblem(sys, samples=nsamples)
-    ram_result = solve(ram)
-    push!(adequacy_results, AdequacyContext(sys, ram_result))
+    ram_result = solve(ram) # TODO: Skip the thermal sensitivities
     ram_end = now()
 
     show_neues(ram_result)
@@ -59,11 +59,7 @@ function iterate_ra_cem(
         base_chronology
     end
 
-    eue_estimator = if endog_risk
-        RiskEstimateParams(chronology, adequacy_results)
-    else
-        nullestimator(chronology, n_regions)
-    end
+    eue_estimator = nullestimator(chronology, n_regions)
 
     aug_end = now()
 
@@ -79,9 +75,10 @@ function iterate_ra_cem(
         store_iteration_step(con, 0, "persistence", store_start => store_end)
     end
 
-    cem = nothing
     sys_built = nothing
+    cem = nothing
     prev_cem = nothing
+    adequacy_results = ExpansionAdequacyContext[]
     n_iters = 0
 
     while (time() < timeout)
@@ -104,7 +101,7 @@ function iterate_ra_cem(
         sys_built = SystemParams(cem)
         ram = AdequacyProblem(sys_built, samples=nsamples)
         ram_result = solve(ram)
-        push!(adequacy_results, AdequacyContext(cem, ram_result))
+        push!(adequacy_results, ExpansionAdequacyContext(cem, ram_result))
         ram_end = now()
 
         show_neues(ram_result)
@@ -215,7 +212,7 @@ already_included(hour::Int, periods::Vector{TimePeriod}) =
     any(p -> in(hour, p.timesteps), periods)
 
 function RiskEstimateParams(
-    time::TimeProxyAssignment, results::Vector{AdequacyContext})
+    time::TimeProxyAssignment, results::Vector{ExpansionAdequacyContext})
 
     period_params = [
         RiskEstimatePeriodParams(results, time, p)
@@ -227,7 +224,7 @@ function RiskEstimateParams(
 end
 
 function RiskEstimatePeriodParams(
-    adequacycontexts::Vector{AdequacyContext},
+    adequacycontexts::Vector{ExpansionAdequacyContext},
     time::TimeProxyAssignment,
     p::Int
 )
@@ -247,9 +244,7 @@ function RiskEstimatePeriodParams(
         shortfalls = adequacycontext.adequacy.shortfalls
 
         nonthermal_availablecapacity =
-            adequacycontext.variable_availability[:, representative_ts] +
-            adequacycontext.adequacy.storage_offset[:, representative_ts] +
-            adequacycontext.adequacy.transmission_offset[:, representative_ts]
+            adequacycontext.nonthermal_availability[:, representative_ts]
 
         base_eue = zeros(R,T)
         nonthermal_dEUE = zeros(R,T)
@@ -283,20 +278,20 @@ function RiskEstimatePeriodParams(
 end
 
 riskparams(
-    unitcounts::AdequacyModel.ThermalRegionUnitCount,
+    unitcounts::ThermalRegionUnitCount,
     adequacyimpact::ThermalRegionAdequacyImpact,
     base_eue::Matrix{Float64}, r::Int, t::Int
 ) = riskparams.(unitcounts.techs, adequacyimpact.techs, Ref(base_eue), r, t)
 
 riskparams(
-    unitcounts::AdequacyModel.ThermalTechUnitCount,
+    unitcounts::ThermalTechUnitCount,
     adequacyimpact::ThermalTechAdequacyImpact,
     base_eue::Matrix{Float64}, r::Int, t::Int
 ) = ThermalTechRiskEstimateParams(
     riskparams.(unitcounts.sites, adequacyimpact.sites, Ref(base_eue), r, t))
 
 riskparams(
-    unitcount::AdequacyModel.ThermalSiteUnitCount,
+    unitcount::ThermalSiteUnitCount,
     adequacyimpact::ThermalSiteAdequacyImpact,
     base_eue::Matrix{Float64}, r::Int, t::Int
 ) = ThermalSiteRiskEstimateParams(unitcount.units, base_eue[r,t] - adequacyimpact.eue[r,t])
