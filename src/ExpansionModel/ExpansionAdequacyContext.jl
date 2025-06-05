@@ -63,8 +63,6 @@ function ExpansionAdequacyContext(
 
     end
 
-    display(nonthermal_availability)
-
     thermal_units = [ThermalRegionUnitCount(region) for region in cem.builds.regions]
 
     return ExpansionAdequacyContext(

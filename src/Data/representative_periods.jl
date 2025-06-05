@@ -43,8 +43,6 @@ function medoid_timegrouping(
 
     end
 
-    println("Initial periods: $groups")
-    println(days)
     return TimeProxyAssignment(periods, days)
 
 end
