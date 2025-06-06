@@ -88,8 +88,11 @@ function capacity_credits(
             else
                 point_efc
             end
-
-            gradient[dim] = (next_efc - prev_efc) / step
+            if step > 0
+                gradient[dim] = (next_efc - prev_efc) / step
+            else
+                gradient[dim] = 0.0
+            end
             reference_capacity[dim] = basestep * (i-1)
 
         end
