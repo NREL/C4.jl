@@ -91,7 +91,8 @@ function add_unit(
 
     region_gen_idxs = copy(sys.region_gen_idxs)
 
-    first_r_gen, last_r_gen = extrema(sys.region_gen_idxs[r])
+    r_gen = sys.region_gen_idxs[r]
+    first_r_gen, last_r_gen = first(r_gen), last(r_gen)
     region_gen_idxs[r] = first_r_gen:(last_r_gen + 1)
 
     for i in (r+1):R
