@@ -170,8 +170,9 @@ function load_storages(sys::SystemParams, meta)
                     s_last += 1
                     names[s_last] = sitename
                     categories[s_last] = tech.name
-                    power_capacity[s_last, :] .= round(Int, site.power_existing .* powerunits_MW)
-                    energy_capacity[s_last, :] .= tech.duration .* power_capacity[s_last, :]
+                    site_power = site.power_existing * powerunits_MW
+                    power_capacity[s_last, :] .= round(Int, site_power)
+                    energy_capacity[s_last, :] .= round(Int, tech.duration * site_power)
                     oneway_efficiency[s_last, :] .= efficiency
                 end
             end
