@@ -3,15 +3,17 @@ struct CapacityCreditCurveParams
     stepsize::Float64 # MW nameplate
     points::Vector{Float64} # MW EFC
 
-    function CapacityCreditCurveParams(stepsize::Float64, points::Vector{Float64})
+    function CapacityCreditCurveParams(stepsize::Float64, points::Vector{Float64}; check_concavity::Bool=true)
         stepsize > 0 || error("Step size must be positive")
 
         iszero(first(points)) ||
             error("First point in the EFC curve should be zero")
 
         d1 = diff(points)
-        all(>=(0), d1) || error("Curve values should be non-decreasing")
-        all(<=(0), diff(d1)) || error("Curve slopes should be non-increasing")
+        if check_concavity
+            all(>=(0), d1) || error("Curve values should be non-decreasing")
+            all(<=(0), diff(d1)) || error("Curve slopes should be non-increasing")
+        end
 
         return new(stepsize, points)
 
@@ -23,25 +25,29 @@ function capacity_credits(
     m::JuMP.Model,
     efc::JuMP.VariableRef,
     build::Union{ExpansionModel.VariableExpansion,
-                 ExpansionModel.StorageExpansion},
+        ExpansionModel.StorageExpansion},
     cc::CapacityCreditCurveParams
 )
 
     n_segments = length(cc.points)
 
-    cc_nameplate(s::Int) = (s-1) * cc.stepsize / powerunits_MW
+    cc_nameplate(s::Int) = (s - 1) * cc.stepsize / powerunits_MW
 
-    cc_slope(s::Int) = if s == 1
-        (cc.points[s+1] - cc.points[s]) / cc.stepsize
-    elseif s == n_segments
-        (cc.points[s] - cc.points[s-1]) / cc.stepsize
-    else
-        (cc.points[s+1] - cc.points[s-1]) / (2*cc.stepsize)
-    end
+    cc_slope(s::Int) =
+        if n_segments == 1
+            0.0
+        elseif n_segments > 1 && s == 1
+            (cc.points[s+1] - cc.points[s]) / cc.stepsize
+        elseif n_segments > 1 && s == n_segments
+            (cc.points[s] - cc.points[s-1]) / cc.stepsize
+        else
+            (cc.points[s+1] - cc.points[s-1]) / (2 * cc.stepsize)
+
+        end
 
     efc_constraints = @constraint(m, [s in 1:n_segments],
         efc <= cc.points[s] / powerunits_MW +
-                (new_nameplate(build) - cc_nameplate(s)) * cc_slope(s)
+               (new_nameplate(build) - cc_nameplate(s)) * cc_slope(s)
     )
 
     return efc_constraints
@@ -78,7 +84,8 @@ function capacity_credits(
               "and capacity credit parameters")
 
     thermal_efc = sum(cc * new_nameplate(tech) for (tech, cc)
-        in zip(region.thermaltechs, capacitycredits.thermaltechs))
+                      in
+                      zip(region.thermaltechs, capacitycredits.thermaltechs))
 
     n_variabletechs = length(capacitycredits.variabletechs)
 
@@ -89,8 +96,9 @@ function capacity_credits(
     variable_efcs = @variable(m, [t in 1:n_variabletechs])
 
     variable_curves = [capacity_credits(m, efc, tech, curveparams)
-        for (efc, tech, curveparams)
-        in zip(variable_efcs, region.variabletechs, capacitycredits.variabletechs)
+                       for (efc, tech, curveparams)
+                       in
+                       zip(variable_efcs, region.variabletechs, capacitycredits.variabletechs)
     ]
 
     n_storagetechs = length(capacitycredits.storagetechs)
@@ -102,8 +110,9 @@ function capacity_credits(
     storage_efcs = @variable(m, [t in 1:n_storagetechs])
 
     storage_curves = [capacity_credits(m, efc, tech, curveparams)
-        for (efc, tech, curveparams)
-        in zip(storage_efcs, region.storagetechs, capacitycredits.storagetechs)
+                      for (efc, tech, curveparams)
+                      in
+                      zip(storage_efcs, region.storagetechs, capacitycredits.storagetechs)
     ]
 
     prm = @constraint(m,

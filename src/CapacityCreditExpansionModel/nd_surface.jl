@@ -11,7 +11,8 @@ struct CapacityCreditSurfaceParams{N} <: CapacityCreditParams
         thermaltechs::Vector{Float64},
         variable_stepsize::Vector{Float64},
         storage_stepsize::Vector{Float64},
-        points::Array{Float64,N}
+        points::Array{Float64,N};
+        check_concavity::Bool=true
     ) where N
 
         n_variabletechs = length(variable_stepsize)
@@ -25,7 +26,9 @@ struct CapacityCreditSurfaceParams{N} <: CapacityCreditParams
         all(>(0), variable_stepsize) && all(>(0), storage_stepsize) ||
             error("Variable and storage CC curve step sizes must be positive")
 
-        test_valid_ccs(points)
+        if check_concavity
+            test_valid_ccs(points)
+        end
 
         return new{N}(thermaltechs, variable_stepsize, storage_stepsize, points)
 
@@ -73,7 +76,7 @@ function capacity_credits(
             basestep = steps[dim] / powerunits_MW
             step = 0
 
-            delta = Tuple(x==dim ? 1 : 0 for x in 1:N)
+            delta = Tuple(x == dim ? 1 : 0 for x in 1:N)
 
             prev_efc = if i > 1
                 step += basestep
@@ -93,7 +96,7 @@ function capacity_credits(
             else
                 gradient[dim] = 0.0
             end
-            reference_capacity[dim] = basestep * (i-1)
+            reference_capacity[dim] = basestep * (i - 1)
 
         end
 
@@ -134,10 +137,11 @@ function capacity_credits(
               "and capacity credit parameters")
 
     thermal_efc = sum(cc * new_nameplate(tech) for (tech, cc)
-        in zip(region.thermaltechs, capacitycredits.thermaltechs))
+                      in
+                      zip(region.thermaltechs, capacitycredits.thermaltechs))
 
     # variable_storage_efc = @variable(m, variable_storage_efc)
-    variable_storage_efc = @variable(m, variable_storage_efc, lower_bound=0)
+    variable_storage_efc = @variable(m, variable_storage_efc, lower_bound = 0)
 
     efc_surface = capacity_credits(
         m, variable_storage_efc,
