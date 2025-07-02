@@ -24,7 +24,10 @@ export availability, TimePeriod, Period, TimeProxyAssignment,
        seasonalperiods, monthlyperiods, weeklyperiods,
        seasonalperiods_byyear, monthlyperiods_byyear, weeklyperiods_byyear,
        dailyperiods, fullchronologyperiods,
-       store_iteration, store_iteration_step
+       store_iteration, store_iteration_step,
+       CapacityCreditParams,
+       CapacityCreditCurveParams, CapacityCreditCurvesParams,
+       CapacityCreditSurfaceParams, ccs_1d, ccs_static
 
 include("time.jl")
 include("sites.jl")
@@ -36,5 +39,7 @@ include("representative_periods.jl")
 include("import_validation.jl")
 include("import.jl")
 include("export.jl")
+
+include("capacitycredits.jl")
 
 end

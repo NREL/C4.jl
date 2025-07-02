@@ -23,7 +23,6 @@ import ..ExpansionModel
 # (not the site level). In this implementation, capacity credit methods
 # assume the problem involves a single region
 
-abstract type CapacityCreditParams end
 abstract type CapacityCreditFormulation end
 
 new_nameplate(build::ExpansionModel.ThermalExpansion) = sum(
@@ -38,9 +37,7 @@ new_nameplate(build::ExpansionModel.StorageExpansion) = sum(
 include("1d_curves.jl")
 include("nd_surface.jl")
 
-export CapacityCreditExpansionProblem,
-       CapacityCreditCurveParams, CapacityCreditCurvesParams,
-       CapacityCreditSurfaceParams
+export CapacityCreditExpansionProblem
 
 mutable struct CapacityCreditExpansionProblem{T <: CapacityCreditFormulation} <: ExpansionModel.AbstractExpansionProblem
 

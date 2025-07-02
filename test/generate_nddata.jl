@@ -32,6 +32,6 @@ function cc_data(maxval::Float64, dims::Int...)
 end
 
 for i in 1:100
-    x = cc_data(100., rand(3:10), rand(3:10), rand(3:10), rand(3:10))
-    CapacityCreditExpansionModel.test_valid_ccs(x)
+    x = cc_data(100., rand(1:10), rand(1:10), rand(1:10), rand(1:10))
+    Data.test_valid_ccs(x)
 end

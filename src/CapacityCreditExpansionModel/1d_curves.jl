@@ -1,26 +1,3 @@
-struct CapacityCreditCurveParams
-
-    stepsize::Float64 # MW nameplate
-    points::Vector{Float64} # MW EFC
-
-    function CapacityCreditCurveParams(stepsize::Float64, points::Vector{Float64}; check_concavity::Bool=true)
-        stepsize > 0 || error("Step size must be positive")
-
-        iszero(first(points)) ||
-            error("First point in the EFC curve should be zero")
-
-        d1 = diff(points)
-        if check_concavity
-            all(>=(0), d1) || error("Curve values should be non-decreasing")
-            all(<=(0), diff(d1)) || error("Curve slopes should be non-increasing")
-        end
-
-        return new(stepsize, points)
-
-    end
-
-end
-
 function capacity_credits(
     m::JuMP.Model,
     efc::JuMP.VariableRef,
@@ -53,13 +30,6 @@ function capacity_credits(
     return efc_constraints
 
 end
-
-struct CapacityCreditCurvesParams <: CapacityCreditParams
-    thermaltechs::Vector{Float64}
-    variabletechs::Vector{CapacityCreditCurveParams}
-    storagetechs::Vector{CapacityCreditCurveParams}
-end
-
 
 struct CapacityCreditCurves <: CapacityCreditFormulation
 

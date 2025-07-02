@@ -1,44 +1,3 @@
-struct CapacityCreditSurfaceParams{N} <: CapacityCreditParams
-
-    thermaltechs::Vector{Float64}
-
-    variable_stepsize::Vector{Float64} # powerunits_MW nameplate
-    storage_stepsize::Vector{Float64} # powerunits_MW nameplate
-
-    points::Array{Float64,N} # powerunits_MW EFC 
-
-    function CapacityCreditSurfaceParams(
-        thermaltechs::Vector{Float64},
-        variable_stepsize::Vector{Float64},
-        storage_stepsize::Vector{Float64},
-        points::Array{Float64,N};
-        check_concavity::Bool=true
-    ) where N
-
-        n_variabletechs = length(variable_stepsize)
-        n_storagetechs = length(storage_stepsize)
-        n_techs = n_variabletechs + n_storagetechs
-
-        n_techs == N ||
-            error("Dimension mismatch between variable and storage " *
-                  "technologies ($(n_techs)) and capacity credit array ($(N))")
-
-        all(>(0), variable_stepsize) && all(>(0), storage_stepsize) ||
-            error("Variable and storage CC curve step sizes must be positive")
-
-        if check_concavity
-            test_valid_ccs(points)
-        end
-
-        return new{N}(thermaltechs, variable_stepsize, storage_stepsize, points)
-
-    end
-
-end
-
-# TODO: Automatically create static and 1D curve parametrizations from
-#       ND surface data
-
 function capacity_credits(
     m::JuMP.Model,
     efc::JuMP.VariableRef,
@@ -153,34 +112,5 @@ function capacity_credits(
 
     return CapacityCreditSurface{N}(
         thermal_efc, variable_storage_efc, efc_surface, prm)
-
-end
-
-const geq0 = >=(0)
-const leq0 = <=(0)
-
-"""
-Check that the surface provided is non-negative, non-decreasing, and concave
-"""
-function test_valid_ccs(x::Array{Float64,N}) where N
-
-    all(geq0, x) || error("Capacity credits must be non-negative")
-
-    for i in 1:N
-
-        dx = diff(x, dims=i)
-        all(geq0, dx) || error(
-            "Capacity credits must be non-decreasing, " *
-            "but the provided values decrease in dimension $i")
-
-        for j in 1:N
-            all(leq0, diff(dx, dims=j)) || error(
-                "The capacity credit surface must be concave " *
-                "(have non-increasing returns), " *
-                "but the second derivative with respect to dimensions " *
-                "$i and $j is positive")
-        end
-
-    end
 
 end
