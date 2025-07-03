@@ -41,6 +41,56 @@ struct CapacityCreditSurfaceParams{N} <: CapacityCreditParams
 
 end
 
+function CapacityCreditSurfaceParams(
+    sys::SystemParams, datapath::String;
+    check_concavity::Bool=true
+)
+
+    thermal_efcs = load_lookup(joinpath(datapath, "thermal.csv"))
+    thermaltechs = [thermal_efcs[tech.name]
+                    for tech in sys.regions[1].thermaltechs]
+
+    variable_stepsizes = load_lookup(joinpath(datapath, "variable.csv"))
+    variable_stepsize = [variable_stepsizes[tech.name]
+                         for tech in sys.regions[1].variabletechs]
+
+    storage_stepsizes = load_lookup(joinpath(datapath, "storage.csv"))
+    storage_stepsize = [storage_stepsizes[tech.name]
+                         for tech in sys.regions[1].storagetechs]
+
+    technames = vcat(
+        [tech.name for tech in sys.regions[1].variabletechs],
+        [tech.name for tech in sys.regions[1].storagetechs])
+
+    data = readdlm(joinpath(datapath, "surface.csv"), ',')
+
+    tech_idxs = indexin(technames, data[1, 1:end-1])
+    all(!isnothing, tech_idxs) ||
+        error("EFC surface data does not contain all variable and storage technologies")
+
+    idxs = data[2:end, tech_idxs]
+
+    techsteps = vec(maximum(idxs, dims=1)) .+ 1
+    points = fill(NaN, techsteps...)
+
+    efcs = Dict(Tuple.(eachrow(idxs)) .=> data[2:end, end])
+    display(efcs)
+
+    for I in CartesianIndices(points)
+        points[I] = efcs[Tuple(I) .- 1]
+    end
+
+    return CapacityCreditSurfaceParams(
+                thermaltechs, variable_stepsize, storage_stepsize, points,
+                check_concavity=check_concavity)
+
+end
+
+function load_lookup(path::String)
+    data = readdlm(path, ',')
+    return Dict(data[i,1] => Float64(data[i,2]) for i in 2:size(data,1))
+end
+
 struct CapacityCreditCurveParams
 
     stepsize::Float64 # MW nameplate
@@ -75,7 +125,9 @@ struct CapacityCreditCurvesParams <: CapacityCreditParams
     storagetechs::Vector{CapacityCreditCurveParams}
 end
 
-function ccs_static(nd_surface::CapacityCreditSurfaceParams)
+function ccs_static(
+    nd_surface::CapacityCreditSurfaceParams;
+    check_concavity::Bool=true)
 
     n_variabletechs = length(nd_surface.variable_stepsize)
     n_storagetechs = length(nd_surface.storage_stepsize)
@@ -88,8 +140,9 @@ function ccs_static(nd_surface::CapacityCreditSurfaceParams)
         idx = Tuple(x == dim ? (1:min(2, size(nd_surface.points, dim))) : 1
                     for x in 1:n_techs)
 
-        variabletechs[dim] =
-            CapacityCreditCurveParams(stepsize, nd_surface.points[idx...])
+        variabletechs[dim] = CapacityCreditCurveParams(
+            stepsize, nd_surface.points[idx...],
+            check_concavity=check_concavity)
 
     end
 
@@ -102,7 +155,9 @@ function ccs_static(nd_surface::CapacityCreditSurfaceParams)
         idx = Tuple(x == dim ? (1:min(2, size(nd_surface.points, dim))) : 1
                     for x in 1:n_techs)
 
-        storagetechs[i] = CapacityCreditCurveParams(stepsize, nd_surface.points[idx...])
+        storagetechs[i] = CapacityCreditCurveParams(
+            stepsize, nd_surface.points[idx...],
+            check_concavity=check_concavity)
 
     end
 
@@ -111,7 +166,9 @@ function ccs_static(nd_surface::CapacityCreditSurfaceParams)
 
 end
 
-function ccs_1d(nd_surface::CapacityCreditSurfaceParams)
+function ccs_1d(
+    nd_surface::CapacityCreditSurfaceParams;
+    check_concavity::Bool=true)
 
     n_variabletechs = length(nd_surface.variable_stepsize)
     n_storagetechs = length(nd_surface.storage_stepsize)
@@ -123,8 +180,9 @@ function ccs_1d(nd_surface::CapacityCreditSurfaceParams)
 
         idx = Tuple(x == dim ? (:) : 1 for x in 1:n_techs)
 
-        variabletechs[dim] =
-            CapacityCreditCurveParams(stepsize, nd_surface.points[idx...])
+        variabletechs[dim] = CapacityCreditCurveParams(
+            stepsize, nd_surface.points[idx...],
+            check_concavity=check_concavity)
 
     end
 
@@ -136,7 +194,9 @@ function ccs_1d(nd_surface::CapacityCreditSurfaceParams)
 
         idx = Tuple(x == dim ? (:) : 1 for x in 1:n_techs)
 
-        storagetechs[i] = CapacityCreditCurveParams(stepsize, nd_surface.points[idx...])
+        storagetechs[i] = CapacityCreditCurveParams(
+            stepsize, nd_surface.points[idx...],
+            check_concavity=check_concavity)
 
     end
 

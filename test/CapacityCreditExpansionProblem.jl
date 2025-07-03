@@ -11,45 +11,53 @@ include("generate_nddata.jl")
 sys = SystemParams("Data/toysystem-coppersheet")
 display(sys)
 
-cc_surface = cc_data(150.0, 3, 4, 3) # random 3D array of wind/solar/storage CCs
+cc_nd = CapacityCreditSurfaceParams(sys, "Data/toysystem/capacitycredits")
 
-# Here we just hardcode things because the numbers are all made up anyways.
-# A more robust solution would be to iterate through
-# sys.region[1].variabletechs, extract each technology's name, and match
-# it with CC data stored somewhere else.
+@testset "ND Surface Loading" begin
 
-cc_nd = CapacityCreditSurfaceParams(
-    [0.9, 0.9], # Gas CT and Gas CC static capacity credits
-    [150., 100], # wind and solar step sizes
-    [10.], # 4h battery step size
-    cc_surface
-)
+    @test cc_nd.thermaltechs == [0.95, 0.9]
+    @test cc_nd.variable_stepsize == [150., 100.]
+    @test cc_nd.storage_stepsize == [10.]
+
+    @test cc_nd.points[1,1,1] ≈ 0
+    @test cc_nd.points[1,2,1] ≈ 55.371477332138895
+    @test cc_nd.points[2,3,1] ≈ 100
+
+end
 
 cc_static = ccs_static(cc_nd)
 
-@test cc_static.thermaltechs == [0.9, 0.9]
+@testset "Static CC Conversion" begin
 
-@test cc_static.variabletechs[1].stepsize == 150
-@test cc_static.variabletechs[1].points == cc_surface[1:2,1,1]
+    @test cc_static.thermaltechs == cc_nd.thermaltechs
 
-@test cc_static.variabletechs[2].stepsize == 100
-@test cc_static.variabletechs[2].points == cc_surface[1,1:2,1]
+    @test cc_static.variabletechs[1].stepsize == cc_nd.variable_stepsize[1]
+    @test cc_static.variabletechs[1].points == cc_nd.points[1:2,1,1]
 
-@test cc_static.storagetechs[1].stepsize == 10
-@test cc_static.storagetechs[1].points == cc_surface[1,1,1:2]
+    @test cc_static.variabletechs[2].stepsize == cc_nd.variable_stepsize[2]
+    @test cc_static.variabletechs[2].points == cc_nd.points[1,1:2,1]
+
+    @test cc_static.storagetechs[1].stepsize == cc_nd.storage_stepsize[1]
+    @test cc_static.storagetechs[1].points == cc_nd.points[1,1,1:1]
+
+end
 
 cc_1d = ccs_1d(cc_nd)
 
-@test cc_1d.thermaltechs == [0.9, 0.9]
+@testset "1D CC Conversion" begin
 
-@test cc_1d.variabletechs[1].stepsize == 150
-@test cc_1d.variabletechs[1].points == cc_surface[:,1,1]
+    @test cc_1d.thermaltechs == cc_nd.thermaltechs
 
-@test cc_1d.variabletechs[2].stepsize == 100
-@test cc_1d.variabletechs[2].points == cc_surface[1,:,1]
+    @test cc_1d.variabletechs[1].stepsize == cc_nd.variable_stepsize[1]
+    @test cc_1d.variabletechs[1].points == cc_nd.points[:,1,1]
 
-@test cc_1d.storagetechs[1].stepsize == 10
-@test cc_1d.storagetechs[1].points == cc_surface[1,1,:]
+    @test cc_1d.variabletechs[2].stepsize == cc_nd.variable_stepsize[2]
+    @test cc_1d.variabletechs[2].points == cc_nd.points[1,:,1]
+
+    @test cc_1d.storagetechs[1].stepsize == cc_nd.storage_stepsize[1]
+    @test cc_1d.storagetechs[1].points == cc_nd.points[1,1,:]
+
+end
 
 peak_load = maximum(sys.regions[1].demand) * powerunits_MW # in MW
 
