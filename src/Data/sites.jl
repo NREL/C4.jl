@@ -27,10 +27,7 @@ struct VariableSiteParams <: VariableSite
 
 end
 
-function availability(site::VariableSiteParams, t::Int)
-    a = site.availability[t]
-    return a < 1e-2 ? 0. : a
-end
+availability(site::VariableSiteParams, t::Int) = site.availability[t]
 
 availablecapacity(site::VariableSiteParams, t::Int) =
     site.availability[t] * site.capacity_existing

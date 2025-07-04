@@ -219,7 +219,8 @@ function load_variablesites!(system::SystemParams, datadir::String)
     end
 
     availabilitiespath = joinpath(datadir, "variable/availability.csv")
-    load_sites_timeseries!(system, VariableParams, availabilitiespath, :availability)
+    load_sites_timeseries!(system, VariableParams, availabilitiespath,
+        :availability, x -> x < 0.01 ? 0. : x)
 
 end
 
