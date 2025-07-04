@@ -74,7 +74,6 @@ function CapacityCreditSurfaceParams(
     points = fill(NaN, techsteps...)
 
     efcs = Dict(Tuple.(eachrow(idxs)) .=> data[2:end, end])
-    display(efcs)
 
     for I in CartesianIndices(points)
         points[I] = efcs[Tuple(I) .- 1]

@@ -133,3 +133,12 @@ for prm in 0:0.1:0.5
     println("System Cost @ PRM = $(prm): ", value(cost(cc_cem)))
 
 end
+
+cem, ram, pcm = solve_capacitycredits(
+    sys, fullchrono, cc_nd, peak_load * 1.15, optimizer,
+    check_dispatch=true, outfile=timestamp * "_cc_nd_full.db")
+
+sys_built = SystemParams(cem)
+display(sys_built)
+println("System Capex: ", value(capex(cem)))
+println("System Opex: ", value(cost(pcm)))

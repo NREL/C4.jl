@@ -36,8 +36,9 @@ new_nameplate(build::ExpansionModel.StorageExpansion) = sum(
 
 include("1d_curves.jl")
 include("nd_surface.jl")
+include("run.jl")
 
-export CapacityCreditExpansionProblem
+export CapacityCreditExpansionProblem, solve_capacitycredits
 
 mutable struct CapacityCreditExpansionProblem{T <: CapacityCreditFormulation} <: ExpansionModel.AbstractExpansionProblem
 
