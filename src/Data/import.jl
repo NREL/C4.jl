@@ -144,12 +144,16 @@ function load_thermalsites!(system::SystemParams, datadir::String)
 
         site = ThermalSiteParams(
             sitename, units_existing, units_new_max,
-            zeros(n_timesteps), ones(n_timesteps))
+            ones(n_timesteps), zeros(n_timesteps), ones(n_timesteps))
 
         tech = get_tech(system, ThermalParams, regionname, techname)
         push!(tech.sites, site)
 
     end
+
+    ratingpath = joinpath(datadir, "thermal/rating.csv")
+    load_sites_timeseries!(system, ThermalParams, ratingpath,
+        :rating, x -> x < 0.01 ? 0. : x)
 
     mttfpath = joinpath(datadir, "thermal/mttf.csv")
     load_sites_timeseries!(system, ThermalParams, mttfpath, :λ, x -> 1/x)

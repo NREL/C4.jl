@@ -24,7 +24,7 @@ function ThermalSiteParams(build::ThermalSiteExpansion)
         site.name,
         site.units_existing + new_units,
         site.units_new_max - new_units,
-        site.λ, site.μ)
+        site.rating, site.λ, site.μ)
 end
 
 function warmstart_builds!(build::ThermalSiteExpansion, prev_build::ThermalSiteExpansion)

@@ -5,23 +5,6 @@ struct AdequacyProblem
     prassys::SystemModel
     samples::Int
 
-    # neue::Float64
-    # neue_stderr::Float64
-    # region_neue::Vector{Float64}
-    # period_eue::Vector{Float64}
-    # surplus_mean::Matrix{Float64}
-    # shortfall_samples::Array{Float64,3}
-
-    # eue::Float64
-    # eue_std::Float64
-    # lole::Float64
-    # lole_std::Float64
-
-    # region_eues::Vector{Float64}
-    # region_eue_stds::Vector{Float64}
-    # region_loles::Vector{Float64}
-    # region_lole_stds::Vector{Float64}
-
     function AdequacyProblem(sys::SystemParams; samples::Int)
 
         n_periods = length(sys.timesteps)
@@ -86,7 +69,7 @@ function load_generators(sys::SystemParams, meta)
                     g_last += 1
                     names[g_last] = sitename * "_$i"
                     categories[g_last] = tech.name
-                    capacity[g_last, :] .= round.(Int, tech.unit_size .* powerunits_MW)
+                    capacity[g_last, :] .= round.(Int, site.rating .* tech.unit_size .* powerunits_MW)
                     lambda[g_last, :] .= site.λ
                     mu[g_last, :] .= site.μ
                 end
