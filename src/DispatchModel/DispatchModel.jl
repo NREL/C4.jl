@@ -12,7 +12,7 @@ import ..GeneratorTechnology, ..StorageTechnology, ..StorageSite,
        ..availablecapacity, ..maxpower, ..maxenergy,
        ..roundtrip_efficiency, ..operating_cost,
        ..name, ..cost, ..cost_generation, ..demand, ..region_from, ..region_to,
-       ..importinginterfaces, ..exportinginterfaces, ..solve!
+       ..importinginterfaces, ..exportinginterfaces, ..solve!, ..powerunits_MW
 
 using ..Data
 

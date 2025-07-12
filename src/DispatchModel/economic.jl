@@ -5,6 +5,7 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
     storagetechs::Vector{StorageDispatch{ST,SS}}
 
     netload::Vector{JuMP_ExpressionRef}
+    unserved_energy::Vector{JuMP.VariableRef}
 
     import_interfaces::Vector{InterfaceDispatch{I}}
     export_interfaces::Vector{InterfaceDispatch{I}}
@@ -30,18 +31,21 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
         storagedispatch = [StorageDispatch(m, region, tech, period)
                            for tech in region.storagetechs]
 
+        unserved_energy = @variable(m, [1:T], lower_bound=0)
+
         netload = @expression(m, [t in 1:T],
                 demand(region, ts[t])
                 - sum(gen.dispatch[t] for gen in thermaldispatch)
                 - sum(gen.dispatch[t] for gen in variabledispatch)
-                - sum(stor.dispatch[t] for stor in storagedispatch))
+                - sum(stor.dispatch[t] for stor in storagedispatch)
+                - unserved_energy[t])
 
         import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
         export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
         new{R,TG,VG,ST,SS,I}(
             thermaldispatch, variabledispatch, storagedispatch,
-            netload, import_interfaces, export_interfaces, region)
+            netload, unserved_energy, import_interfaces, export_interfaces, region)
 
     end
 
@@ -50,7 +54,8 @@ end
 cost(dispatch::RegionEconomicDispatch) =
     sum(cost(thermaltech) for thermaltech in dispatch.thermaltechs; init=0) +
     sum(cost(variabletech) for variabletech in dispatch.variabletechs; init=0) +
-    sum(cost(storagetech) for storagetech in dispatch.storagetechs; init=0)
+    sum(cost(storagetech) for storagetech in dispatch.storagetechs; init=0) +
+    sum(dispatch.unserved_energy) * (1000 * powerunits_MW)
 
 struct EconomicDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch{S}
 
