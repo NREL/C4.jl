@@ -32,7 +32,7 @@ function iterate_ra_cem(
     nsamples::Int=1000, skip_existing_stress_periods::Bool=false,
     timeout::Float64=Inf, first_feasible::Bool=true,
     aspp::Bool=true, endog_risk::Bool=true, outfile::String="",
-    check_dispatch::Bool=false)
+    check_dispatch::Bool=false, check_dispatch_voll::Float64=NaN)
 
     persist = length(outfile) > 0
     max_neue = maximum(max_neues)
@@ -151,7 +151,8 @@ function iterate_ra_cem(
         pcm_start = now()
         n_iters += 1
         fullchrono = fullchronologyperiods(sys_built, daylength=base_chronology.daylength)
-        pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
+        pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono,
+                              optimizer, check_dispatch_voll)
         solve!(pcm)
         pcm_end = now()
 

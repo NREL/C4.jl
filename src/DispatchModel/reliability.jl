@@ -49,8 +49,11 @@ struct ReliabilityDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch
     system::S
 
     function ReliabilityDispatch(
-        m::JuMP.Model, system::S, period::TimePeriod
+        m::JuMP.Model, system::S, period::TimePeriod, voll::Float64=NaN
     ) where { R<:Region, I<:Interface, S<:System{R,I} }
+
+        isnan(voll) ||
+            @warn("A non-NaN VoLL was provided, but will be ignored by ReliabilityDispatch")
 
         n_timesteps = length(period)
         n_regions = length(system.regions)
