@@ -1,14 +1,14 @@
-function SystemParams(datadir::String)
+function SystemParams(datadir::String, ram_type::String)
 
     name = basename(datadir)
 
     regions, timesteps = load_regions(datadir)
-    interfaces = load_interfaces(datadir, regions)
 
+    interfaces = load_interfaces(datadir, regions)
     system = SystemParams(name, timesteps, regions, interfaces)
 
     load_thermaltechs!(system, datadir)
-    load_thermalsites!(system, datadir)
+    load_thermalsites!(system, datadir, ram_type)
 
     load_variabletechs!(system, datadir)
     load_variablesites!(system, datadir)
@@ -120,7 +120,7 @@ function load_thermaltechs!(system::SystemParams, datadir::String)
 
 end
 
-function load_thermalsites!(system::SystemParams, datadir::String)
+function load_thermalsites!(system::SystemParams, datadir::String, ram_type::String)
 
     n_timesteps = length(system.timesteps)
 
@@ -155,10 +155,15 @@ function load_thermalsites!(system::SystemParams, datadir::String)
     load_sites_timeseries!(system, ThermalParams, ratingpath,
         :rating, x -> x < 0.01 ? 0. : x)
 
-    mttfpath = joinpath(datadir, "thermal/mttf.csv")
-    load_sites_timeseries!(system, ThermalParams, mttfpath, :λ, x -> 1/x)
+    if ram_type == "time_dep"
+        mttfpath = joinpath(datadir, "thermal/time_dep_mttf.csv")    
+        mttrpath = joinpath(datadir, "thermal/time_dep_mttr.csv")
+    else
+        mttfpath = joinpath(datadir, "thermal/mttf.csv")    
+        mttrpath = joinpath(datadir, "thermal/mttr.csv")
+    end
 
-    mttrpath = joinpath(datadir, "thermal/mttr.csv")
+    load_sites_timeseries!(system, ThermalParams, mttfpath, :λ, x -> 1/x)
     load_sites_timeseries!(system, ThermalParams, mttrpath, :μ, x -> 1/x)
 
 end
