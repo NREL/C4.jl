@@ -12,7 +12,8 @@ using C4.CapacityCreditExpansionModel
 function solve_capacitycredits(
     sys::SystemParams, chronology::TimeProxyAssignment,
     capacitycredits::CapacityCreditParams, build_efc::Float64, optimizer;
-    nsamples::Int=1000, outfile::String="", check_dispatch::Bool=false)
+    nsamples::Int=1000, outfile::String="",
+    check_dispatch::Bool=false, check_dispatch_voll::Float64=NaN)
 
     persist = length(outfile) > 0
 
@@ -76,7 +77,8 @@ function solve_capacitycredits(
 
         pcm_start = now()
         fullchrono = fullchronologyperiods(sys_built, daylength=chronology.daylength)
-        pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
+        pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono,
+                              optimizer, check_dispatch_voll)
         solve!(pcm)
         pcm_end = now()
 
