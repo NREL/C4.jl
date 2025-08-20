@@ -1,5 +1,6 @@
 import DBInterface
 import DuckDB
+import Dates: DateTime
 
 import ..store, ..powerunits_MW
 
@@ -18,10 +19,12 @@ struct AdequacyAppender
 
     adequacies::DuckDB.Appender
     region_adequacies::DuckDB.Appender
+    timestep_adequacies::DuckDB.Appender
 
     AdequacyAppender(con::DuckDB.DB) = new(
         DuckDB.Appender(con, "adequacies"),
         DuckDB.Appender(con, "region_adequacies"),
+        DuckDB.Appender(con, "timestep_adequacies"),
     )
 
 end
@@ -29,9 +32,11 @@ end
 function DuckDB.close(appender::AdequacyAppender)
     DuckDB.close(appender.adequacies)
     DuckDB.close(appender.region_adequacies)
+    DuckDB.close(appender.timestep_adequacies)
     return
 end
 
+# TODO: Store region x hourly EUE results (for heatmaps, etc)
 function store(con::DBInterface.Connection, iter::Int, result::AdequacyResult)
 
     DBInterface.execute(con, "CREATE TABLE IF NOT EXISTS adequacies (
@@ -52,6 +57,17 @@ function store(con::DBInterface.Connection, iter::Int, result::AdequacyResult)
         lole DOUBLE,
         lole_std DOUBLE,
         PRIMARY KEY (iteration, region)
+    )")
+
+    DBInterface.execute(con, "CREATE TABLE IF NOT EXISTS timestep_adequacies (
+        iteration INTEGER REFERENCES iterations(id),
+        timestep TIMESTAMP,
+        demand DOUBLE,
+        eue DOUBLE,
+        eue_std DOUBLE,
+        lole DOUBLE,
+        lole_std DOUBLE,
+        PRIMARY KEY (iteration, timestep)
     )")
 
     appender = AdequacyAppender(con)
@@ -83,6 +99,24 @@ function store(con::DBInterface.Connection, iter::Int, result::AdequacyResult)
         DuckDB.append(appender.region_adequacies, PRAS.val(lole))
         DuckDB.append(appender.region_adequacies, PRAS.stderror(lole))
         DuckDB.end_row(appender.region_adequacies)
+
+    end
+
+    timestep_demands = vec(sum(result.shortfalls.regions.load, dims=1))
+
+    for (t, timestamp) in enumerate(result.shortfalls.timestamps)
+
+        eue = PRAS.EUE(result.shortfalls, timestamp)
+        lole = PRAS.LOLE(result.shortfalls, timestamp)
+
+        DuckDB.append(appender.timestep_adequacies, iter)
+        DuckDB.append(appender.timestep_adequacies, DateTime(timestamp))
+        DuckDB.append(appender.timestep_adequacies, timestep_demands[t])
+        DuckDB.append(appender.timestep_adequacies, PRAS.val(eue))
+        DuckDB.append(appender.timestep_adequacies, PRAS.stderror(eue))
+        DuckDB.append(appender.timestep_adequacies, PRAS.val(lole))
+        DuckDB.append(appender.timestep_adequacies, PRAS.stderror(lole))
+        DuckDB.end_row(appender.timestep_adequacies)
 
     end
 
