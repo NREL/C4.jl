@@ -1,63 +1,23 @@
-struct ThermalSiteRiskEstimateParams
-    units::Int
-    dEUE::Float64
-end
-
-function eue_adjustment(
-    build::ThermalSiteExpansion,
-    riskparams::ThermalSiteRiskEstimateParams)
-
-    # Don't add terms where expansion isn't possible
-    iszero(build.params.units_new_max) && return 0
-
-    units = build.params.units_existing + build.units_new
-    return -riskparams.dEUE * (units - riskparams.units)
-
-end
-
-struct ThermalTechRiskEstimateParams
-    sites::Vector{ThermalSiteRiskEstimateParams}
-end
-
-function eue_adjustment(
-    builds::ThermalExpansion,
-    riskparams::ThermalTechRiskEstimateParams)
-
-    return sum(eue_adjustment(sitebuild, siteriskparams)
-               for (sitebuild, siteriskparams)
-               in zip(builds.sites, riskparams.sites))
-
-end
-
 struct RiskEstimatePlaneParams
 
     base_eue::Float64
 
     # (conditionally) Deterministic Capacity:
-    # (Available Variable Gen + Storage Discharge - Storage Charge
-    #  + Imports - Exports - Demand)
-    nonthermal_available::Float64
+    # Available Variable Gen + Available Thermal Gen
+    # + Storage Discharge - Storage Charge + Imports - Exports
+    available_capacity::Float64
 
     # EUE change associated with adding (conditionally) deterministic capacity
-    nonthermal_dEUE::Float64
-
-    thermaltechs::Vector{ThermalTechRiskEstimateParams} # per tech
+    dEUE::Float64
 
 end
 
 function eue_estimate(
-    nonthermal_available::JuMP_ExpressionRef,
-    thermaltechs::Vector{ThermalExpansion},
+    available_capacity::JuMP_ExpressionRef,
     riskparams::RiskEstimatePlaneParams)
 
-    thermal_adjustment = sum(eue_adjustment(techbuilds, techriskparams)
-        for (techbuilds, techriskparams)
-        in zip(thermaltechs, riskparams.thermaltechs); init=0)
-
-    nonthermal_adjustment = -riskparams.nonthermal_dEUE *
-        (nonthermal_available - riskparams.nonthermal_available)
-
-    return riskparams.base_eue + thermal_adjustment + nonthermal_adjustment
+    return riskparams.base_eue - riskparams.dEUE *
+        (available_capacity - riskparams.available_capacity)
 
 end
 
@@ -117,9 +77,7 @@ struct ReliabilityEstimate
 
         eue_planes = @constraint(m, [r in 1:R, t in 1:T, j in 1:J],
             eue[r,t] >= eue_estimate(
-                dispatch.nonthermal_available[r,t],
-                system.regions[r].thermaltechs,
-                riskparams[r,t,j])
+                dispatch.available_capacity[r,t], riskparams[r,t,j])
         )
 
         new(dispatch.period, eue, eue_planes)
