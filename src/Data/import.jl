@@ -10,8 +10,13 @@ function SystemParams(datadir::String)
     load_thermaltechs!(system, datadir)
     load_thermalsites!(system, datadir)
 
-    load_variabletechs!(system, datadir)
-    load_variablesites!(system, datadir)
+    variabledir = joinpath(datadir, "variable")
+
+    load_existing_variabletechs!(system, variabledir)
+    load_existing_variablesites!(system, variabledir)
+
+    load_candidate_variabletechs!(system, variabledir)
+    load_candidate_variablesites!(system, variabledir)
 
     load_storagetechs!(system, datadir)
     load_storagesites!(system, datadir)
@@ -45,7 +50,8 @@ function load_regions(datadir::String)
         region = RegionParams(
             regionname, demand,
             ThermalParams[],
-            VariableParams[],
+            VariableExistingParams[],
+            VariableCandidateParams[],
             StorageParams[],
             Int[], Int[] # Region indices
         )
@@ -163,44 +169,50 @@ function load_thermalsites!(system::SystemParams, datadir::String)
 
 end
 
-function load_variabletechs!(system::SystemParams, datadir::String)
+function load_existing_variabletechs!(system::SystemParams, datadir::String)
 
     regions = regionset(system)
-    techspath = joinpath(datadir, "variable/regiontechs.csv")
+    techspath = joinpath(datadir, "existing_techs.csv")
     validator = AddValidator{String}("region", regions, "tech", techspath)
 
     techs = readdlm(techspath, ',')
+
+    validate_columns(
+        techs, ["region", "tech", "category", "cost_generation"],
+        techspath)
 
     for r in 2:size(techs, 1)
 
         regionname = string(techs[r, 1])
         techname = string(techs[r, 2])
+        category = string(techs[r, 3])
 
         validate!(validator, regionname, techname)
 
-        cost_capital = Float64(techs[r, 3]) * powerunits_MW
         cost_generation = Float64(techs[r, 4]) * powerunits_MW
 
-        tech = VariableParams(
-            techname, cost_capital, cost_generation, VariableSiteParams[])
+        tech = VariableExistingParams(
+            techname, category, cost_generation, VariableExistingSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
-        push!(region.variabletechs, tech)
+        push!(region.variabletechs_existing, tech)
 
     end
 
 end
 
-function load_variablesites!(system::SystemParams, datadir::String)
+function load_existing_variablesites!(system::SystemParams, datadir::String)
 
     n_timesteps = length(system.timesteps)
 
-    regiontechs = regiontechset(system, VariableParams)
-    sitespath = joinpath(datadir, "variable/sites.csv")
+    regiontechs = regiontechset(system, VariableExistingParams)
+    sitespath = joinpath(datadir, "existing_sites.csv")
     validator = AddValidator{String}(
         "region-technology pair", regiontechs, "site", sitespath)
 
     sites = readdlm(sitespath, ',')
+
+    validate_columns(sites, ["region", "tech", "site", "capacity"], sitespath)
 
     for r in 2:size(sites, 1)
 
@@ -210,20 +222,89 @@ function load_variablesites!(system::SystemParams, datadir::String)
 
         validate!(validator, (regionname, techname), sitename)
 
-        capacity_existing = Float64(sites[r, 4]) / powerunits_MW
-        capacity_new_max = Float64(sites[r, 5]) / powerunits_MW
+        capacity = Float64(sites[r, 4]) / powerunits_MW
 
-        site = VariableSiteParams(
-            sitename, capacity_existing, capacity_new_max,
-            zeros(n_timesteps))
+        site = VariableExistingSiteParams(
+            sitename, capacity, zeros(n_timesteps))
 
-        tech = get_tech(system, VariableParams, regionname, techname)
+        tech = get_tech(system, VariableExistingParams, regionname, techname)
         push!(tech.sites, site)
 
     end
 
-    availabilitiespath = joinpath(datadir, "variable/availability.csv")
-    load_sites_timeseries!(system, VariableParams, availabilitiespath,
+    availabilitiespath = joinpath(datadir, "existing_availability.csv")
+    load_sites_timeseries!(system, VariableExistingParams, availabilitiespath,
+        :availability, x -> x < 0.01 ? 0. : x)
+
+end
+
+function load_candidate_variabletechs!(system::SystemParams, datadir::String)
+
+    regions = regionset(system)
+    techspath = joinpath(datadir, "candidate_techs.csv")
+    validator = AddValidator{String}("region", regions, "tech", techspath)
+
+    techs = readdlm(techspath, ',')
+
+    validate_columns(
+        techs, ["region", "tech", "category", "cost_capital", "cost_generation"],
+        techspath)
+
+    for r in 2:size(techs, 1)
+
+        regionname = string(techs[r, 1])
+        techname = string(techs[r, 2])
+        category = string(techs[r, 3])
+
+        validate!(validator, regionname, techname)
+
+        cost_capital = Float64(techs[r, 4]) * powerunits_MW
+        cost_generation = Float64(techs[r, 5]) * powerunits_MW
+
+        tech = VariableCandidateParams(
+            techname, category, cost_capital, cost_generation, VariableCandidateSiteParams[])
+
+        _, region = getbyname(system.regions, regionname)
+        push!(region.variabletechs_candidate, tech)
+
+    end
+
+end
+
+function load_candidate_variablesites!(system::SystemParams, datadir::String)
+
+    n_timesteps = length(system.timesteps)
+
+    regiontechs = regiontechset(system, VariableCandidateParams)
+    sitespath = joinpath(datadir, "candidate_sites.csv")
+    validator = AddValidator{String}(
+        "region-technology pair", regiontechs, "site", sitespath)
+
+    sites = readdlm(sitespath, ',')
+
+    validate_columns(
+        sites, ["region", "tech", "site", "capacity_max"], sitespath)
+
+    for r in 2:size(sites, 1)
+
+        regionname = string(sites[r, 1])
+        techname = string(sites[r, 2])
+        sitename = string(sites[r, 3])
+
+        validate!(validator, (regionname, techname), sitename)
+
+        capacity_max = Float64(sites[r, 4]) / powerunits_MW
+
+        site = VariableCandidateSiteParams(
+            sitename, capacity_max, zeros(n_timesteps))
+
+        tech = get_tech(system, VariableCandidateParams, regionname, techname)
+        push!(tech.sites, site)
+
+    end
+
+    availabilitiespath = joinpath(datadir, "candidate_availability.csv")
+    load_sites_timeseries!(system, VariableCandidateParams, availabilitiespath,
         :availability, x -> x < 0.01 ? 0. : x)
 
 end
@@ -294,7 +375,7 @@ function load_storagesites!(system::SystemParams, datadir::String)
 end
 
 function load_sites_timeseries!(
-    system::SystemParams, techtype::Type{<:Technology},
+    system::SystemParams, techtype::Type{<:TechnologyParams},
     datapath::String, field::Symbol, transformer::Function=identity
 )
 

@@ -1,7 +1,7 @@
-struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
+struct RegionEconomicDispatch{R,TG,ST,SS,I} <: RegionDispatch{R}
 
-    thermaltechs::Vector{GeneratorDispatch{TG}}
-    variabletechs::Vector{GeneratorDispatch{VG}}
+    thermaltechs::Vector{ThermalDispatch{TG}}
+    variabletechs::Vector{VariableDispatch} # heterogenously typed
     storagetechs::Vector{StorageDispatch{ST,SS}}
 
     netload::Vector{JuMP_ExpressionRef}
@@ -18,16 +18,16 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
         region::R,
         interfaces::Vector{InterfaceDispatch{I}},
         period::TimePeriod, voll::Float64
-    ) where {TG, VG, ST, SS, I, R<:Region{TG,VG,ST,SS,I} }
+    ) where {TG, ST, SS, I, R<:Region{TG,ST,SS,I} }
 
         T = length(period)
         ts = period.timesteps
 
-        thermaldispatch = [GeneratorDispatch(m, region, tech, period)
+        thermaldispatch = [ThermalDispatch(m, region, tech, period)
                            for tech in region.thermaltechs]
 
-        variabledispatch = [GeneratorDispatch(m, region, tech, period)
-                            for tech in region.variabletechs]
+        variabledispatch = [VariableDispatch(m, region, tech, period)
+                            for tech in variabletechs(region)]
 
         storagedispatch = [StorageDispatch(m, region, tech, period)
                            for tech in region.storagetechs]
@@ -44,7 +44,7 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
         import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
         export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
-        new{R,TG,VG,ST,SS,I}(
+        new{R,TG,ST,SS,I}(
             thermaldispatch, variabledispatch, storagedispatch,
             netload, unserved_energy, voll,
             import_interfaces, export_interfaces, region)

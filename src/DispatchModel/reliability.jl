@@ -14,7 +14,7 @@ struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
         region::R,
         interfaces::Vector{InterfaceDispatch{I}},
         period::TimePeriod
-    ) where {TG, VG, ST, SS, I, R<:Region{TG,VG,ST,SS,I}}
+    ) where {TG, ST, SS, I, R<:Region{TG,ST,SS,I}}
 
         n_timesteps = length(period)
         ts = period.timesteps
@@ -23,7 +23,7 @@ struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
                            for stor in region.storagetechs]
 
         available_capacity = @expression(m, [t in 1:n_timesteps],
-                sum(availablecapacity(gen, ts[t]) for gen in region.variabletechs)
+                sum(availablecapacity(gen, ts[t]) for gen in variabletechs(region))
                 + sum(availablecapacity(gen, ts[t]) for gen in region.thermaltechs)
                 + sum(stor.dispatch[t] for stor in storagedispatch))
 

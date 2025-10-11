@@ -1,36 +1,36 @@
 # TODO: Differentiate reliability vs economic dispatch in variable names
-struct GeneratorDispatch{G<:GeneratorTechnology}
+struct ThermalDispatch{G<:ThermalTechnology}
 
     dispatch::Vector{JuMP.VariableRef}
     dispatch_max::Vector{JuMP_LessThanConstraintRef}
 
-    gen::G
+    tech::G
 
-    function GeneratorDispatch(
+    function ThermalDispatch(
         m::JuMP.Model, region::Region,
-        gen::G, period::TimePeriod
-    ) where G <: GeneratorTechnology
+        tech::G, period::TimePeriod
+    ) where G <: ThermalTechnology
 
         T = length(period)
         ts = period.timesteps
 
         dispatch = @variable(m, [1:T], lower_bound = 0)
-        fullname = join([name(region), name(gen), period.name], ",")
-        varnames!(dispatch, "gen_dispatch[$(fullname)]", 1:T)
+        fullname = join([name(region), name(tech), period.name], ",")
+        varnames!(dispatch, "tech_dispatch[$(fullname)]", 1:T)
 
         dispatch_max = @constraint(m, [t in 1:T],
-            dispatch[t] <= availablecapacity(gen, ts[t]))
+            dispatch[t] <= availablecapacity(tech, ts[t]))
 
-        return new{G}(dispatch, dispatch_max, gen)
+        return new{G}(dispatch, dispatch_max, tech)
 
     end
 
 end
 
-cost(dispatch::GeneratorDispatch) =
-    sum(dispatch.dispatch) * cost_generation(dispatch.gen)
+cost(dispatch::ThermalDispatch) =
+    sum(dispatch.dispatch) * cost_generation(dispatch.tech)
 
-name(dispatch::GeneratorDispatch) = name(dispatch.gen)
+name(dispatch::ThermalDispatch) = name(dispatch.tech)
 
 struct StorageSiteDispatch{S<:StorageSite}
 

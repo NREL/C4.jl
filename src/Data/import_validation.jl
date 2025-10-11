@@ -65,3 +65,21 @@ function validate!(validator::UpdateValidator{T}, x::T) where T
     return
 
 end
+
+function validate_columns(
+    table::Matrix,
+    cols_expected::Vector{<:AbstractString},
+    filepath::AbstractString
+)
+
+    for (c, expected) in enumerate(cols_expected)
+
+        actual = table[1, c]
+
+        actual == expected || error(
+            "Unexpected name for column $c in $filepath: " *
+            "expected '$expected', got '$actual'")
+
+    end
+
+end

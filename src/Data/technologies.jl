@@ -25,27 +25,6 @@ availablecapacity(tech::ThermalParams, t::Int) =
 
 cost_generation(params::ThermalParams) = params.cost_generation
 
-struct VariableParams <: VariableTechnology
-
-    name::String
-
-    cost_capital::Float64 # annualized $/MW
-    cost_generation::Float64 # $/MWh
-
-    sites::Vector{VariableSiteParams}
-
-end
-
-nameplatecapacity(params::VariableParams) =
-    sum(site.capacity_existing for site in params.sites; init=0)
-
-availablecapacity(tech::VariableParams, t::Int) =
-    sum(availablecapacity(site, t) for site in tech.sites; init=0)
-
-cost_generation(params::VariableParams) = params.cost_generation
-
-const GeneratorParams = Union{ThermalParams,VariableParams}
-
 struct StorageParams <: StorageTechnology{StorageSiteParams}
 
     name::String
@@ -70,5 +49,9 @@ roundtrip_efficiency(tech::StorageParams) = tech.roundtrip_efficiency
 
 operating_cost(tech::StorageParams) = tech.cost_operation
 
-const TechnologyParams = Union{GeneratorParams,StorageParams}
+
+const TechnologyParams = Union{
+    ThermalParams,VariableExistingParams,VariableCandidateParams,StorageParams
+}
+
 name(tech::TechnologyParams) = tech.name

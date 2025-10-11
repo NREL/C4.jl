@@ -18,8 +18,7 @@ region_from(iface::InterfaceParams) = iface.region_from
 region_to(iface::InterfaceParams) = iface.region_to
 
 struct RegionParams <: Region{
-    ThermalParams, VariableParams,
-    StorageParams, StorageSiteParams, InterfaceParams
+    ThermalParams, StorageParams, StorageSiteParams, InterfaceParams
 }
 
     name::String
@@ -27,7 +26,10 @@ struct RegionParams <: Region{
     demand::Vector{Float64}
 
     thermaltechs::Vector{ThermalParams}
-    variabletechs::Vector{VariableParams}
+
+    variabletechs_existing::Vector{VariableExistingParams}
+    variabletechs_candidate::Vector{VariableCandidateParams}
+
     storagetechs::Vector{StorageParams}
 
     export_interfaces::Vector{Int}
@@ -38,8 +40,16 @@ end
 name(region::RegionParams) = region.name
 demand(region::RegionParams, t::Int) = region.demand[t]
 
+variabletechs(region::RegionParams) = region.variabletechs_existing
+
 techs(region::RegionParams, ::Type{<:ThermalTechnology}) = region.thermaltechs
-techs(region::RegionParams, ::Type{<:VariableTechnology}) = region.variabletechs
+
+techs(region::RegionParams, ::Type{VariableCandidateParams}) =
+    region.variabletechs_candidate
+
+techs(region::RegionParams, ::Type{VariableExistingParams}) =
+    region.variabletechs_existing
+
 techs(region::RegionParams, ::Type{<:StorageTechnology}) = region.storagetechs
 
 importinginterfaces(region::RegionParams) = region.import_interfaces
@@ -63,7 +73,7 @@ regionset(system::SystemParams) = Set(r.name for r in system.regions)
 
 function get_tech(
     system::SystemParams,
-    techtype::Type{<:Technology},
+    techtype::Type{<:TechnologyParams},
     regionname::String,
     techname::String
 )
@@ -73,7 +83,7 @@ function get_tech(
 
 end
 
-function regiontechset(system::SystemParams, techtype::Type{<:Technology})
+function regiontechset(system::SystemParams, techtype::Type{<:TechnologyParams})
     result = Set{Tuple{String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -85,7 +95,7 @@ end
 
 function get_site(
     system::SystemParams,
-    techtype::Type{<:Technology},
+    techtype::Type{<:TechnologyParams},
     regionname::String,
     techname::String,
     sitename::String
@@ -100,7 +110,7 @@ end
 total_demand(sys::SystemParams) =
     sum(sum(region.demand) for region in sys.regions)
 
-function regiontechsiteset(system::SystemParams, techtype::Type{<:Technology})
+function regiontechsiteset(system::SystemParams, techtype::Type{<:TechnologyParams})
     result = Set{Tuple{String,String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -154,7 +164,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
 
         println(io, region.name, "\t",
                     length(region.thermaltechs), "\t",
-                    length(region.variabletechs), "\t",
+                    length(region.variabletechs_existing), "\t",
                     length(region.storagetechs), "\t",
                     join(sort(neighbours), ", "))
 
@@ -165,7 +175,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
     for region in sys.regions
 
         has_thermal = any(tech -> nameplatecapacity(tech) > 0, region.thermaltechs)
-        has_variable = any(tech -> nameplatecapacity(tech) > 0, region.variabletechs)
+        has_variable = length(region.variabletechs_existing) > 0
         has_storage = any(tech -> powerrating(tech) > 0, region.storagetechs)
 
         println(io, region.name, " (Peak Load: ", maximum(region.demand) * powerunits_MW, " MW)")
@@ -180,7 +190,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
                     n_units, " x ", thermaltech.unit_size * powerunits_MW, " MW")
         end
 
-        has_variable && for variabletech in region.variabletechs
+        has_variable && for variabletech in region.variabletechs_existing
             capacity = nameplatecapacity(variabletech)
             iszero(capacity) && continue
             println(io, "\t", variabletech.name, ": ", capacity * powerunits_MW, " MW")

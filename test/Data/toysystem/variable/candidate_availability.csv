@@ -1,5 +1,5 @@
 region,A,C,B,C
-tech,Wind,Wind,Solar PV,Solar PV
+tech,New Wind,New Wind,New Solar PV,New Solar PV
 site,,,,
 2020-01-01T00:00:00.000,0.5,0.3,0.0,0.0
 2020-01-01T01:00:00.000,0.6,0.5,0.4,0.3

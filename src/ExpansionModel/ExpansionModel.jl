@@ -8,16 +8,22 @@ import  ..JuMP_GreaterThanConstraintRef, ..JuMP_LessThanConstraintRef,
         ..Site, ..ThermalSite, ..VariableSite, ..StorageSite,
         ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
         ..Interface, ..Region, ..System, ..varnames!,
-        ..availablecapacity, ..maxpower, ..maxenergy,
+        ..nameplatecapacity, ..availablecapacity, ..availability, ..maxpower, ..maxenergy,
         ..roundtrip_efficiency, ..operating_cost,
-        ..name, ..cost, ..cost_generation, ..region_from, ..region_to,
+        ..name, ..variabletechs, ..sites, ..cost, ..cost_generation,
+        ..region_from, ..region_to,
         ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
+
+import ..Data: VariableExistingParams, VariableExistingSiteParams
 
 using ..Data
 using ..AdequacyModel
 using ..DispatchModel
 
+include("variable.jl")
+
 include("build.jl")
+
 include("riskestimates.jl")
 
 export ExpansionProblem, ExpansionAdequacyContext, warmstart_builds!, solve!,

@@ -84,10 +84,10 @@ function load_generators(sys::SystemParams, meta)
             lambda[g_last, :] .= 0.
             mu[g_last, :] .= 1.
 
-            for tech in region.variabletechs
+            for tech in region.variabletechs_existing
                 for site in tech.sites
                     capacity[g_last, :] .+=
-                        round.(Int, site.capacity_existing .* powerunits_MW .* site.availability)
+                        round.(Int, site.capacity .* powerunits_MW .* site.availability)
                 end
             end
 
@@ -122,10 +122,10 @@ function count_gens(sys::SystemParams)
             end
         end
 
-        for tech in region.variabletechs
+        for tech in region.variabletechs_existing
             has_variable[r] && break
             for site in tech.sites
-                if site.capacity_existing > 0
+                if site.capacity > 0
                     has_variable[r] = true
                     break
                 end
