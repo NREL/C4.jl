@@ -9,7 +9,8 @@ import PRAS
 import PRAS: assess, EUE, LOLE, val, stderror
 
 using ..Data
-import ..powerunits_MW, ..ThermalTechnology, ..Region
+import ..powerunits_MW, ..ThermalTechnology, ..Region,
+       ..maxpower, ..maxenergy
 
 export AdequacyProblem, AdequacyResult, solve, show_neues, region_neues
 

@@ -120,14 +120,14 @@ function store(appender::ExpansionAppender, iter::Int, site::VariableSiteExpansi
 
 end
 
-function store(appender::ExpansionAppender, iter::Int, site::StorageSiteExpansion,
+function store(appender::ExpansionAppender, iter::Int,
                tech::StorageExpansion, region::RegionExpansion)
 
-    new_power = value(site.power_new) * powerunits_MW
-    new_energy = value(site.energy_new) * powerunits_MW
+    new_power = value(tech.power_new) * powerunits_MW
+    new_energy = value(tech.energy_new) * powerunits_MW
 
     DuckDB.append(appender.sitebuilds, iter)
-    DuckDB.append(appender.sitebuilds, name(site))
+    DuckDB.append(appender.sitebuilds, "")
     DuckDB.append(appender.sitebuilds, name(tech))
     DuckDB.append(appender.sitebuilds, name(region))
     DuckDB.append(appender.sitebuilds, new_power)

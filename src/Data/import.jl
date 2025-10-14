@@ -18,8 +18,12 @@ function SystemParams(datadir::String)
     load_candidate_variabletechs!(system, variabledir)
     load_candidate_variablesites!(system, variabledir)
 
-    load_storagetechs!(system, datadir)
-    load_storagesites!(system, datadir)
+    storagedir = joinpath(datadir, "storage")
+
+    load_existing_storagetechs!(system, storagedir)
+    load_existing_storagesites!(system, storagedir)
+
+    load_candidate_storagetechs!(system, storagedir)
 
     return system
 
@@ -52,7 +56,8 @@ function load_regions(datadir::String)
             ThermalParams[],
             VariableExistingParams[],
             VariableCandidateParams[],
-            StorageParams[],
+            StorageExistingParams[],
+            StorageCandidateParams[],
             Int[], Int[] # Region indices
         )
 
@@ -309,45 +314,53 @@ function load_candidate_variablesites!(system::SystemParams, datadir::String)
 
 end
 
-function load_storagetechs!(system::SystemParams, datadir::String)
+function load_existing_storagetechs!(system::SystemParams, datadir::String)
 
     regions = regionset(system)
-    techspath = joinpath(datadir, "storage/regiontechs.csv")
+    techspath = joinpath(datadir, "existing_techs.csv")
     validator = AddValidator{String}("region", regions, "tech", techspath)
 
     techs = readdlm(techspath, ',')
+
+    validate_columns(
+        techs,
+        ["region", "tech", "category",
+         "duration", "cost_operation", "roundtrip_efficiency"],
+        techspath)
 
     for r in 2:size(techs, 1)
 
         regionname = string(techs[r, 1])
         techname = string(techs[r, 2])
+        category = string(techs[r, 3])
 
         validate!(validator, regionname, techname)
 
-        cost_capital_power = Float64(techs[r, 3]) * powerunits_MW
-        cost_capital_energy = Float64(techs[r, 4]) * powerunits_MW
+        duration = Float64(techs[r, 4])
         cost_operation = Float64(techs[r, 5]) * powerunits_MW
         roundtrip_efficiency = Float64(techs[r, 6])
 
-        tech = StorageParams(
-            techname, cost_capital_power, cost_capital_energy, cost_operation,
-            roundtrip_efficiency, StorageSiteParams[])
+        tech = StorageExistingParams(
+            techname, category, cost_operation, roundtrip_efficiency,
+            duration, StorageExistingSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
-        push!(region.storagetechs, tech)
+        push!(region.storagetechs_existing, tech)
 
     end
 
 end
 
-function load_storagesites!(system::SystemParams, datadir::String)
+function load_existing_storagesites!(system::SystemParams, datadir::String)
 
-    regiontechs = regiontechset(system, StorageParams)
-    sitespath = joinpath(datadir, "storage/sites.csv")
+    regiontechs = regiontechset(system, StorageExistingParams)
+    sitespath = joinpath(datadir, "existing_sites.csv")
     validator = AddValidator{String}(
         "region-technology pair", regiontechs, "site", sitespath)
 
     sites = readdlm(sitespath, ',')
+
+    validate_columns(sites, ["region", "tech", "site", "power"], sitespath)
 
     for r in 2:size(sites, 1)
 
@@ -357,18 +370,55 @@ function load_storagesites!(system::SystemParams, datadir::String)
 
         validate!(validator, (regionname, techname), sitename)
 
-        power_existing = Float64(sites[r, 4]) / powerunits_MW
-        power_new_max = Float64(sites[r, 5]) / powerunits_MW
+        power = Float64(sites[r, 4]) / powerunits_MW
 
-        energy_existing = Float64(sites[r, 6]) / powerunits_MW
-        energy_new_max = Float64(sites[r, 7]) / powerunits_MW
+        site = StorageExistingSiteParams(sitename, power)
 
-        site = StorageSiteParams(
-            sitename, power_existing, power_new_max,
-            energy_existing, energy_new_max)
-
-        tech = get_tech(system, StorageParams, regionname, techname)
+        tech = get_tech(system, StorageExistingParams, regionname, techname)
         push!(tech.sites, site)
+
+    end
+
+end
+
+function load_candidate_storagetechs!(system::SystemParams, datadir::String)
+
+    regions = regionset(system)
+    techspath = joinpath(datadir, "candidate_techs.csv")
+    validator = AddValidator{String}("region", regions, "tech", techspath)
+
+    techs = readdlm(techspath, ',')
+
+    validate_columns(
+        techs,
+        ["region", "tech", "category",
+         "cost_operation", "roundtrip_efficiency",
+         "cost_capital_power", "cost_capital_energy",
+         "power_max", "energy_max"],
+        techspath)
+
+    for r in 2:size(techs, 1)
+
+        regionname = string(techs[r, 1])
+        techname = string(techs[r, 2])
+        category = string(techs[r, 3])
+
+        validate!(validator, regionname, techname)
+
+        cost_operation = Float64(techs[r, 4]) * powerunits_MW
+        roundtrip_efficiency = Float64(techs[r, 5])
+        cost_capital_power = Float64(techs[r, 6]) * powerunits_MW
+        cost_capital_energy = Float64(techs[r, 7]) * powerunits_MW
+        power_max = Float64(techs[r, 8]) * powerunits_MW
+        energy_max = Float64(techs[r, 9]) * powerunits_MW
+
+        tech = StorageCandidateParams(
+            techname, category, cost_operation, roundtrip_efficiency,
+            cost_capital_power, cost_capital_energy,
+            power_max, energy_max)
+
+        _, region = getbyname(system.regions, regionname)
+        push!(region.storagetechs_candidate, tech)
 
     end
 

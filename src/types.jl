@@ -51,24 +51,18 @@ abstract type ThermalSite <: Site end
 abstract type ThermalTechnology <: Technology end
 
 """
-StorageSite is an abstract type that can be used to instantiate
-dispatch problems. Instances of StorageSite should define:
-```
-maxpower(::StorageSite)
-maxenergy(::StorageSite)
-```
-"""
-abstract type StorageSite <: Site end
-
-"""
 StorageTechnology is an abstract type that can be used to instantiate
 dispatch problems. Instances of StorageTechnology should define:
+
 ```
-rating_power(::StorageTechnology)
-rating_energy(::StorageTechnology)
+maxpower(::StorageTechnology)
+maxenergy(::StorageTechnology)
+operating_cost(::StorageTechnology) -> Float64
+roundtrip_efficiency(::StorageTechnology) -> Float64
 ```
 """
-abstract type StorageTechnology{SS<:StorageSite} <: Technology end
+abstract type StorageTechnology <: Technology end
+
 function maxenergy end
 function maxpower end
 function operating_cost end
@@ -85,14 +79,14 @@ dispatch problems. Instances of Region should define:
 name(::Region)
 demand(::Region, t::Int)
 variabletechs(::Region) -> Vector{VariableTechnology}
+storagetechs(::Region) -> Vector{StorageTechnology}
 ```
 """
-abstract type Region{
-    TG<:ThermalTechnology, ST<:StorageTechnology, SS<:StorageSite, I<:Interface}
-end
+abstract type Region{TG<:ThermalTechnology, I<:Interface} end
 
 function demand end
 function variabletechs end
+function storagetechs end
 function importinginterfaces end
 function exportinginterfaces end
 

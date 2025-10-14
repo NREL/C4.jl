@@ -5,14 +5,14 @@ import JuMP: @variable, @constraint, @expression, @objective, value
 
 import IterTools: zip_longest
 
-import ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology, ..StorageSite,
+import ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System,
        ..JuMP_ExpressionRef, ..JuMP_LessThanConstraintRef,
        ..JuMP_GreaterThanConstraintRef, ..JuMP_EqualToConstraintRef, ..varnames!,
        ..availablecapacity, ..maxpower, ..maxenergy,
        ..roundtrip_efficiency, ..operating_cost,
        ..name, ..cost, ..cost_generation, ..demand, ..region_from, ..region_to,
-       ..variabletechs,
+       ..variabletechs, ..storagetechs,
        ..importinginterfaces, ..exportinginterfaces, ..solve!, ..powerunits_MW
 
 using ..Data

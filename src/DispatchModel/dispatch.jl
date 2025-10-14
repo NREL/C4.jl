@@ -32,10 +32,11 @@ cost(dispatch::ThermalDispatch) =
 
 name(dispatch::ThermalDispatch) = name(dispatch.tech)
 
-struct StorageSiteDispatch{S<:StorageSite}
+struct StorageDispatch{S<:StorageTechnology}
 
     charge::Vector{JuMP.VariableRef}
     discharge::Vector{JuMP.VariableRef}
+    dispatch::Vector{JuMP_ExpressionRef}
 
     charge_max::Vector{JuMP_LessThanConstraintRef}
     discharge_max::Vector{JuMP_LessThanConstraintRef}
@@ -49,23 +50,23 @@ struct StorageSiteDispatch{S<:StorageSite}
     e_low::JuMP.VariableRef # MWh
     e_low_def::Vector{JuMP_LessThanConstraintRef}
 
-    site::S
+    stor::S
 
-    function StorageSiteDispatch(
-        m::JuMP.Model, region::Region, stor::ST, site::SS, period::TimePeriod
-    ) where {SS <: StorageSite, ST <: StorageTechnology{SS}}
+    function StorageDispatch(
+        m::JuMP.Model, region::Region, stor::S,
+        period::TimePeriod) where S <: StorageTechnology
 
         T = length(period)
 
         charge = @variable(m, [1:T], lower_bound = 0)
-        fullname = join([name(region), name(stor), name(site), period.name], ",")
+        fullname = join([name(region), name(stor), period.name], ",")
         varnames!(charge, "stor_charge[$(fullname)]", 1:T)
 
         discharge = @variable(m, [1:T], lower_bound = 0)
-        fullname = join([name(region), name(stor), name(site), period.name], ",")
+        fullname = join([name(region), name(stor), period.name], ",")
         varnames!(discharge, "stor_discharge[$(fullname)]", 1:T)
 
-        capacity = maxpower(site)
+        capacity = maxpower(stor)
         eff = sqrt(roundtrip_efficiency(stor))
 
         charge_max = @constraint(m, [t in 1:T], charge[t] <= capacity)
@@ -81,47 +82,25 @@ struct StorageSiteDispatch{S<:StorageSite}
         e_low = @variable(m, base_name="stor_ΔE_low[$(fullname)]")
         e_low_def = @constraint(m, [t in 1:T],
             e_low <= eff * sum(charge[1:t]) - 1/eff * sum(discharge[1:t]))
+        dispatch = @expression(m, [t in 1:T], discharge[t] - charge[t])
 
-        return new{SS}(
-            charge, discharge, charge_max, discharge_max,
-            e_net, e_net_def, e_high, e_high_def, e_low, e_low_def, site)
-
-    end
-
-end
-
-usage(dispatch::StorageSiteDispatch) = sum(dispatch.charge) + sum(dispatch.discharge)
-
-struct StorageDispatch{ST<:StorageTechnology, SS<:StorageSite}
-
-    sites::Vector{StorageSiteDispatch{SS}}
-
-    dispatch::Vector{JuMP_ExpressionRef}
-
-    stor::ST
-
-    function StorageDispatch(
-        m::JuMP.Model, region::Region, stor::ST, period::TimePeriod
-    ) where {SS, ST <: StorageTechnology{SS}}
-
-        T = length(period)
-
-        sites = [StorageSiteDispatch(m, region, stor, site, period)
-                 for site in stor.sites]
-
-        dispatch = @expression(m, [t in 1:T],
-           sum(site.discharge[t] - site.charge[t] for site in sites)
-        )
-
-        return new{ST, SS}(sites, dispatch, stor)
+        return new{S}(
+            charge, discharge, dispatch, charge_max, discharge_max,
+            e_net, e_net_def, e_high, e_high_def, e_low, e_low_def,
+            stor)
 
     end
 
 end
 
-name(dispatch::StorageDispatch) = name(dispatch.stor)
+name(dispatch::StorageDispatch) =
+    name(dispatch.stor)
+
+usage(dispatch::StorageDispatch) =
+    sum(dispatch.charge) + sum(dispatch.discharge)
+
 cost(dispatch::StorageDispatch) =
-    sum(usage(site) for site in dispatch.sites; init=0) * operating_cost(dispatch.stor)
+    usage(dispatch) * operating_cost(dispatch.stor)
 
 struct InterfaceDispatch{I<:Interface}
 
