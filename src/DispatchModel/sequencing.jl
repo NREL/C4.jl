@@ -1,4 +1,4 @@
-struct StorageSiteDispatchRecurrence
+struct StorageDispatchRecurrence
 
     emin_first::JuMP_LessThanConstraintRef
     emax_first::JuMP_LessThanConstraintRef
@@ -7,12 +7,13 @@ struct StorageSiteDispatchRecurrence
 
     soc_last::JuMP_ExpressionRef
 
-    function StorageSiteDispatchRecurrence(
+    function StorageDispatchRecurrence(
         m::JuMP.Model,
-        prev_recurrence::Union{StorageSiteDispatchRecurrence,Nothing},
-        site::StorageSite, dispatch::StorageSiteDispatch, repetitions::Int)
+        prev_recurrence::Union{StorageDispatchRecurrence,Nothing},
+        storage::StorageTechnology, dispatch::StorageDispatch,
+        repetitions::Int)
 
-        energy = maxenergy(site)
+        energy = maxenergy(storage)
 
         soc0_first = isnothing(prev_recurrence) ? 0 : prev_recurrence.soc_last
         soc0_last = soc0_first + (repetitions - 1) * dispatch.e_net
@@ -25,33 +26,6 @@ struct StorageSiteDispatchRecurrence
         soc_last = soc0_first + repetitions * dispatch.e_net
 
         new(emin_first, emax_first, emin_last, emax_last, soc_last)
-
-    end
-
-end
-
-struct StorageDispatchRecurrence
-
-    sites::Vector{StorageSiteDispatchRecurrence}
-
-    function StorageDispatchRecurrence(
-        m::JuMP.Model,
-        prev_recurrence::Union{StorageDispatchRecurrence,Nothing},
-        storage::StorageTechnology,
-        dispatch::StorageDispatch, repetitions::Int
-    )
-
-        prev_recurrence_sites = isnothing(prev_recurrence) ?
-            StorageSiteDispatchRecurrence[] : prev_recurrence.sites
-
-        sites = [
-            StorageSiteDispatchRecurrence(
-                m, prev_siterecurrence, sitestor, sitedispatch, repetitions)
-            for (prev_siterecurrence, sitestor, sitedispatch)
-            in zip_longest(prev_recurrence_sites, storage.sites, dispatch.sites)
-        ]
-
-        new(sites)
 
     end
 
@@ -70,14 +44,14 @@ struct RegionDispatchRecurrence
         prev_recurrence_stors = isnothing(prev_recurrence) ?
             StorageDispatchRecurrence[] : prev_recurrence.storagetechs
 
-        storagetechs = [
+        stors = [
             StorageDispatchRecurrence(
                 m, prev_storrecurrence, stor, stordispatch, repetitions)
             for (prev_storrecurrence, stor, stordispatch)
-            in zip_longest(prev_recurrence_stors, region.storagetechs, dispatch.storagetechs)
+            in zip_longest(prev_recurrence_stors, storagetechs(region), dispatch.storagetechs)
         ]
 
-        new(storagetechs)
+        new(stors)
 
     end
 

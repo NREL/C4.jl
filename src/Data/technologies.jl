@@ -25,33 +25,10 @@ availablecapacity(tech::ThermalParams, t::Int) =
 
 cost_generation(params::ThermalParams) = params.cost_generation
 
-struct StorageParams <: StorageTechnology{StorageSiteParams}
-
-    name::String
-
-    cost_capital_power::Float64 # annualized $/MW
-    cost_capital_energy::Float64 # annualized $/MWh
-    cost_operation::Float64 # $/MWh
-
-    roundtrip_efficiency::Float64
-
-    sites::Vector{StorageSiteParams}
-
-end
-
-powerrating(tech::StorageParams) =
-    sum(site.power_existing for site in tech.sites; init=0)
-
-energyrating(tech::StorageParams) =
-    sum(site.energy_existing for site in tech.sites; init=0)
-
-roundtrip_efficiency(tech::StorageParams) = tech.roundtrip_efficiency
-
-operating_cost(tech::StorageParams) = tech.cost_operation
-
-
 const TechnologyParams = Union{
-    ThermalParams,VariableExistingParams,VariableCandidateParams,StorageParams
+    ThermalParams,
+    VariableExistingParams, VariableCandidateParams,
+    StorageExistingParams, StorageCandidateParams
 }
 
 name(tech::TechnologyParams) = tech.name

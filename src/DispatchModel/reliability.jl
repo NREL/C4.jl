@@ -1,6 +1,6 @@
-struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
+struct RegionReliabilityDispatch{R,I} <: RegionDispatch{R}
 
-    storagetechs::Vector{StorageDispatch{ST,SS}}
+    storagetechs::Vector{StorageDispatch}
 
     available_capacity::Vector{JuMP_ExpressionRef}
 
@@ -14,13 +14,13 @@ struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
         region::R,
         interfaces::Vector{InterfaceDispatch{I}},
         period::TimePeriod
-    ) where {TG, ST, SS, I, R<:Region{TG,ST,SS,I}}
+    ) where {TG, I, R<:Region{TG,I}}
 
         n_timesteps = length(period)
         ts = period.timesteps
 
         storagedispatch = [StorageDispatch(m, region, stor, period)
-                           for stor in region.storagetechs]
+                           for stor in storagetechs(region)]
 
         available_capacity = @expression(m, [t in 1:n_timesteps],
                 sum(availablecapacity(gen, ts[t]) for gen in variabletechs(region))
@@ -30,8 +30,8 @@ struct RegionReliabilityDispatch{R,ST,SS,I} <: RegionDispatch{R}
         import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
         export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
-        new{R,ST,SS,I}(storagedispatch, available_capacity,
-                       import_interfaces, export_interfaces, region)
+        new{R,I}(storagedispatch, available_capacity,
+                 import_interfaces, export_interfaces, region)
 
     end
 

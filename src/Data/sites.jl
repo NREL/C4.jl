@@ -18,24 +18,9 @@ availability(site::ThermalSiteParams, t::Int) =
 availableunits(site::ThermalSiteParams, t::Int) =
     availability(site, t) * site.units_existing
 
-struct StorageSiteParams <: StorageSite
-
-    name::String
-
-    power_existing::Float64
-    power_new_max::Float64
-
-    energy_existing::Float64
-    energy_new_max::Float64
-
-end
-
-maxpower(site::StorageSiteParams) = site.power_existing
-maxenergy(site::StorageSiteParams) = site.energy_existing
-
 const SiteParams = Union{
     ThermalSiteParams,VariableExistingSiteParams,VariableCandidateSiteParams,
-    StorageSiteParams
+    StorageExistingSiteParams
 }
 
 name(site::SiteParams) = site.name

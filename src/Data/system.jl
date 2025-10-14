@@ -17,9 +17,7 @@ availablecapacity(iface::InterfaceParams) = iface.capacity_existing
 region_from(iface::InterfaceParams) = iface.region_from
 region_to(iface::InterfaceParams) = iface.region_to
 
-struct RegionParams <: Region{
-    ThermalParams, StorageParams, StorageSiteParams, InterfaceParams
-}
+struct RegionParams <: Region{ThermalParams, InterfaceParams}
 
     name::String
 
@@ -30,7 +28,8 @@ struct RegionParams <: Region{
     variabletechs_existing::Vector{VariableExistingParams}
     variabletechs_candidate::Vector{VariableCandidateParams}
 
-    storagetechs::Vector{StorageParams}
+    storagetechs_existing::Vector{StorageExistingParams}
+    storagetechs_candidate::Vector{StorageCandidateParams}
 
     export_interfaces::Vector{Int}
     import_interfaces::Vector{Int}
@@ -41,6 +40,7 @@ name(region::RegionParams) = region.name
 demand(region::RegionParams, t::Int) = region.demand[t]
 
 variabletechs(region::RegionParams) = region.variabletechs_existing
+storagetechs(region::RegionParams) = region.storagetechs_existing
 
 techs(region::RegionParams, ::Type{<:ThermalTechnology}) = region.thermaltechs
 
@@ -50,7 +50,9 @@ techs(region::RegionParams, ::Type{VariableCandidateParams}) =
 techs(region::RegionParams, ::Type{VariableExistingParams}) =
     region.variabletechs_existing
 
-techs(region::RegionParams, ::Type{<:StorageTechnology}) = region.storagetechs
+techs(region::RegionParams, ::Type{StorageExistingParams}) = region.storagetechs_existing
+
+techs(region::RegionParams, ::Type{StorageCandidateParams}) = region.storagetechs_candidate
 
 importinginterfaces(region::RegionParams) = region.import_interfaces
 exportinginterfaces(region::RegionParams) = region.export_interfaces
@@ -165,7 +167,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
         println(io, region.name, "\t",
                     length(region.thermaltechs), "\t",
                     length(region.variabletechs_existing), "\t",
-                    length(region.storagetechs), "\t",
+                    length(region.storagetechs_existing), "\t",
                     join(sort(neighbours), ", "))
 
     end
@@ -176,7 +178,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
 
         has_thermal = any(tech -> nameplatecapacity(tech) > 0, region.thermaltechs)
         has_variable = length(region.variabletechs_existing) > 0
-        has_storage = any(tech -> powerrating(tech) > 0, region.storagetechs)
+        has_storage = length(region.storagetechs_existing) > 0
 
         println(io, region.name, " (Peak Load: ", maximum(region.demand) * powerunits_MW, " MW)")
 
@@ -190,14 +192,14 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
                     n_units, " x ", thermaltech.unit_size * powerunits_MW, " MW")
         end
 
-        has_variable && for variabletech in region.variabletechs_existing
+        for variabletech in region.variabletechs_existing
             capacity = nameplatecapacity(variabletech)
             iszero(capacity) && continue
             println(io, "\t", variabletech.name, ": ", capacity * powerunits_MW, " MW")
         end
 
-        has_storage && for storagetech in region.storagetechs
-            power, energy = powerrating(storagetech), energyrating(storagetech)
+        for storagetech in region.storagetechs_existing
+            power, energy = maxpower(storagetech), maxenergy(storagetech)
             iszero(power) && continue
             println(io, "\t", storagetech.name, ": ",
                     power * powerunits_MW, " MW (", energy / power, " h)")
