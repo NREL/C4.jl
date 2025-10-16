@@ -172,13 +172,18 @@ end
 
 function store(appender::DataAppender, stor::StorageCandidateParams, region::RegionParams)
 
-    DuckDB.append(appender.techs, stor.name)
-    DuckDB.append(appender.techs, region.name)
+    DuckDB.append(appender.techs, name(stor))
+    DuckDB.append(appender.techs, name(region))
     DuckDB.append(appender.techs, "storage")
     DuckDB.append(appender.techs, stor.cost_operation)
     DuckDB.append(appender.techs, stor.cost_capital_power / powerunits_MW)
     DuckDB.append(appender.techs, stor.cost_capital_energy / powerunits_MW)
     DuckDB.end_row(appender.techs)
+
+    DuckDB.append(appender.sites, "")
+    DuckDB.append(appender.sites, name(stor))
+    DuckDB.append(appender.sites, name(region))
+    DuckDB.end_row(appender.sites)
 
 end
 
