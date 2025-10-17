@@ -409,8 +409,8 @@ function load_candidate_storagetechs!(system::SystemParams, datadir::String)
         roundtrip_efficiency = Float64(techs[r, 5])
         cost_capital_power = Float64(techs[r, 6]) * powerunits_MW
         cost_capital_energy = Float64(techs[r, 7]) * powerunits_MW
-        power_max = Float64(techs[r, 8]) * powerunits_MW
-        energy_max = Float64(techs[r, 9]) * powerunits_MW
+        power_max = Float64(techs[r, 8]) / powerunits_MW
+        energy_max = Float64(techs[r, 9]) / powerunits_MW
 
         tech = StorageCandidateParams(
             techname, category, cost_operation, roundtrip_efficiency,
