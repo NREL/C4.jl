@@ -1,82 +1,3 @@
-struct ThermalSiteExpansion <: ThermalSite
-
-    params::ThermalSiteParams
-    units_new::JuMP.VariableRef
-
-    function ThermalSiteExpansion(
-        m::JuMP.Model, siteparams::ThermalSiteParams,
-        techparams::ThermalParams, regionparams::RegionParams
-    )
-
-        fullname = join([regionparams.name, techparams.name, siteparams.name], ",")
-        units_new = @variable(m, integer=true, lower_bound=0, upper_bound=siteparams.units_new_max)
-        JuMP.set_name(units_new, "thermal_new_units[$fullname]")
-        new(siteparams, units_new)
-
-    end
-
-end
-
-function ThermalSiteParams(build::ThermalSiteExpansion)
-    site = build.params
-    new_units = round(Int, value(build.units_new))
-    return ThermalSiteParams(
-        site.name,
-        site.units_existing + new_units,
-        site.units_new_max - new_units,
-        site.rating, site.λ, site.μ)
-end
-
-function warmstart_builds!(build::ThermalSiteExpansion, prev_build::ThermalSiteExpansion)
-    JuMP.set_start_value(build.units_new, value(prev_build.units_new))
-    return
-end
-
-const SiteExpansion = Union{ThermalSiteExpansion,VariableSiteExpansion}
-name(site::SiteExpansion) = name(site.params)
-
-struct ThermalExpansion <: ThermalTechnology
-
-    params::ThermalParams
-    sites::Vector{ThermalSiteExpansion}
-
-    function ThermalExpansion(
-        m::JuMP.Model, techparams::ThermalParams, regionparams::RegionParams
-    )
-
-        sites = [ThermalSiteExpansion(m, siteparams, techparams, regionparams)
-                 for siteparams in techparams.sites]
-
-        new(techparams, sites)
-
-    end
-
-end
-
-nameplatecapacity(build::ThermalExpansion) = sum(
-        (site.params.units_existing + site.units_new) * build.params.unit_size
-        for site in build.sites; init=0)
-
-availablecapacity(build::ThermalExpansion, t::Int) = sum(
-        (site.params.units_existing + site.units_new) * build.params.unit_size
-        * availability(site.params, t)
-        for site in build.sites; init=0)
-
-cost(build::ThermalExpansion) =
-    sum(site.units_new for site in build.sites; init=0) *
-    build.params.unit_size * build.params.cost_capital
-
-cost_generation(tech::ThermalExpansion) = cost_generation(tech.params)
-
-function ThermalParams(build::ThermalExpansion)
-    thermaltech = build.params
-    return ThermalParams(
-        thermaltech.name,
-        thermaltech.cost_capital, thermaltech.cost_generation,
-        thermaltech.unit_size,
-        ThermalSiteParams.(build.sites))
-end
-
 const TechnologyExpansion = Union{
     ThermalExpansion,VariableExpansion,StorageExpansion
 }
@@ -127,7 +48,7 @@ function warmstart_builds!(build::InterfaceExpansion, prev_build::InterfaceExpan
     return
 end
 
-struct RegionExpansion <: Region{ThermalExpansion, InterfaceExpansion}
+struct RegionExpansion <: Region{InterfaceExpansion}
 
     params::RegionParams
 
@@ -138,7 +59,7 @@ struct RegionExpansion <: Region{ThermalExpansion, InterfaceExpansion}
     function RegionExpansion(m::JuMP.Model, regionparams::RegionParams)
 
         thermaltechs = [ThermalExpansion(m, techparams, regionparams)
-                        for techparams in regionparams.thermaltechs]
+                        for techparams in regionparams.thermaltechs_candidate]
 
         variabletechs = [VariableExpansion(m, techparams, regionparams)
                         for techparams in regionparams.variabletechs_candidate]
@@ -163,6 +84,9 @@ cost(build::RegionExpansion) =
     sum(cost(variabletech) for variabletech in build.variabletechs; init=0) +
     sum(cost(storagetech) for storagetech in build.storagetechs; init=0)
 
+thermaltechs(region::RegionExpansion) =
+    [region.thermaltechs; region.params.thermaltechs_existing]
+
 variabletechs(region::RegionExpansion) =
     [region.variabletechs; region.params.variabletechs_existing]
 
@@ -172,6 +96,12 @@ storagetechs(region::RegionExpansion) =
 function RegionParams(build::RegionExpansion)
 
     region = build.params
+
+    thermal_existing = vcat(
+            region.thermaltechs_existing,
+            [ThermalExistingParams(tech)
+             for tech in build.thermaltechs
+             if value(nameplatecapacity(tech)) > 0])
 
     variable_existing = vcat(
             region.variabletechs_existing,
@@ -187,7 +117,8 @@ function RegionParams(build::RegionExpansion)
 
     return RegionParams(
         region.name, region.demand,
-        ThermalParams.(build.thermaltechs),
+        thermal_existing,
+        ThermalCandidateParams.(build.thermaltechs),
         variable_existing,
         VariableCandidateParams.(build.variabletechs),
         storage_existing,

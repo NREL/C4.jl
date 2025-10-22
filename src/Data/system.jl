@@ -17,13 +17,14 @@ availablecapacity(iface::InterfaceParams) = iface.capacity_existing
 region_from(iface::InterfaceParams) = iface.region_from
 region_to(iface::InterfaceParams) = iface.region_to
 
-struct RegionParams <: Region{ThermalParams, InterfaceParams}
+struct RegionParams <: Region{InterfaceParams}
 
     name::String
 
     demand::Vector{Float64}
 
-    thermaltechs::Vector{ThermalParams}
+    thermaltechs_existing::Vector{ThermalExistingParams}
+    thermaltechs_candidate::Vector{ThermalCandidateParams}
 
     variabletechs_existing::Vector{VariableExistingParams}
     variabletechs_candidate::Vector{VariableCandidateParams}
@@ -39,10 +40,15 @@ end
 name(region::RegionParams) = region.name
 demand(region::RegionParams, t::Int) = region.demand[t]
 
+thermaltechs(region::RegionParams) = region.thermaltechs_existing
 variabletechs(region::RegionParams) = region.variabletechs_existing
 storagetechs(region::RegionParams) = region.storagetechs_existing
 
-techs(region::RegionParams, ::Type{<:ThermalTechnology}) = region.thermaltechs
+techs(region::RegionParams, ::Type{ThermalExistingParams}) =
+    region.thermaltechs_existing
+
+techs(region::RegionParams, ::Type{ThermalCandidateParams}) =
+    region.thermaltechs_candidate
 
 techs(region::RegionParams, ::Type{VariableCandidateParams}) =
     region.variabletechs_candidate
@@ -50,9 +56,11 @@ techs(region::RegionParams, ::Type{VariableCandidateParams}) =
 techs(region::RegionParams, ::Type{VariableExistingParams}) =
     region.variabletechs_existing
 
-techs(region::RegionParams, ::Type{StorageExistingParams}) = region.storagetechs_existing
+techs(region::RegionParams, ::Type{StorageExistingParams}) =
+    region.storagetechs_existing
 
-techs(region::RegionParams, ::Type{StorageCandidateParams}) = region.storagetechs_candidate
+techs(region::RegionParams, ::Type{StorageCandidateParams}) =
+    region.storagetechs_candidate
 
 importinginterfaces(region::RegionParams) = region.import_interfaces
 exportinginterfaces(region::RegionParams) = region.export_interfaces
@@ -165,7 +173,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
         end
 
         println(io, region.name, "\t",
-                    length(region.thermaltechs), "\t",
+                    length(region.thermaltechs_existing), "\t",
                     length(region.variabletechs_existing), "\t",
                     length(region.storagetechs_existing), "\t",
                     join(sort(neighbours), ", "))
@@ -176,7 +184,7 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
 
     for region in sys.regions
 
-        has_thermal = any(tech -> nameplatecapacity(tech) > 0, region.thermaltechs)
+        has_thermal = length(region.thermaltechs_existing) > 0
         has_variable = length(region.variabletechs_existing) > 0
         has_storage = length(region.storagetechs_existing) > 0
 
@@ -185,11 +193,12 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
         has_thermal || has_variable || has_storage ||
             println(io, "\t(No resources)")
 
-        has_thermal && for thermaltech in region.thermaltechs
-            n_units = num_units(thermaltech)
-            iszero(n_units) && continue
-            println(io, "\t", thermaltech.name, ": ",
-                    n_units, " x ", thermaltech.unit_size * powerunits_MW, " MW")
+        for thermaltech in region.thermaltechs_existing
+            println(io, "\t", thermaltech.name, ":")
+            for site in thermaltech.sites
+                println(io, "\t\t", site.name, ": ",
+                        site.units, " x ", site.unit_size * powerunits_MW, " MW")
+            end
         end
 
         for variabletech in region.variabletechs_existing
