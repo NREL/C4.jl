@@ -4,23 +4,22 @@ using Dates, DelimitedFiles
 
 import Base: length
 
-import ..ThermalSite, ..VariableSite, ..Technology,
+import ..VariableSite, ..Technology,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System, ..cost_generation,
        ..maxpower, ..maxenergy, ..roundtrip_efficiency, ..operating_cost,
-       ..name, ..variabletechs, ..storagetechs, ..sites,
-       ..availability, ..nameplatecapacity, ..availablecapacity,
+       ..name, ..variabletechs, ..storagetechs, ..thermaltechs,
+       ..sites, ..availability, ..nameplatecapacity, ..availablecapacity,
        ..region_from, ..region_to,
        ..demand, ..importinginterfaces, ..exportinginterfaces,
        ..powerunits_MW
 
 # TODO: Rename Period -> DispatchPeriod and TimePeriod -> Period
 export TimePeriod, Period, TimeProxyAssignment,
-       ThermalParams, ThermalSiteParams,
+       ThermalExistingParams, ThermalExistingSiteParams, ThermalCandidateParams,
        VariableExistingParams, VariableExistingSiteParams,
        VariableCandidateParams, VariableCandidateSiteParams,
-       StorageExistingParams, StorageExistingSiteParams,
-       StorageCandidateParams,
+       StorageExistingParams, StorageExistingSiteParams, StorageCandidateParams,
        RegionParams, InterfaceParams, SystemParams,
        timestepcount, total_demand,
        singleperiod,
@@ -31,6 +30,7 @@ export TimePeriod, Period, TimeProxyAssignment,
 
 include("time.jl")
 
+include("thermal.jl")
 include("variable.jl")
 include("storage.jl")
 

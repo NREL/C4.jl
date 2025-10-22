@@ -12,7 +12,7 @@ import ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..availablecapacity, ..maxpower, ..maxenergy,
        ..roundtrip_efficiency, ..operating_cost,
        ..name, ..cost, ..cost_generation, ..demand, ..region_from, ..region_to,
-       ..variabletechs, ..storagetechs,
+       ..variabletechs, ..storagetechs, ..thermaltechs,
        ..importinginterfaces, ..exportinginterfaces, ..solve!, ..powerunits_MW
 
 using ..Data

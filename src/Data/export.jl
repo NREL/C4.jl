@@ -95,7 +95,8 @@ function store(appender::DataAppender, region::RegionParams)
     DuckDB.append(appender.regions, region.name)
     DuckDB.end_row(appender.regions)
 
-    foreach(tech -> store(appender, tech, region), region.thermaltechs)
+    foreach(tech -> store(appender, tech, region), region.thermaltechs_existing)
+    foreach(tech -> store(appender, tech, region), region.thermaltechs_candidate)
 
     foreach(tech -> store(appender, tech, region), region.variabletechs_existing)
     foreach(tech -> store(appender, tech, region), region.variabletechs_candidate)
@@ -141,7 +142,24 @@ end
 
 function store(
     appender::DataAppender,
-    tech::ThermalParams,
+    tech::ThermalExistingParams,
+    region::RegionParams)
+
+    DuckDB.append(appender.techs, tech.name)
+    DuckDB.append(appender.techs, region.name)
+    DuckDB.append(appender.techs, "thermal")
+    DuckDB.append(appender.techs, tech.cost_generation / powerunits_MW)
+    DuckDB.append(appender.techs, nothing)
+    DuckDB.append(appender.techs, nothing)
+    DuckDB.end_row(appender.techs)
+
+    foreach(site -> store(appender, site, tech, region), tech.sites)
+
+end
+
+function store(
+    appender::DataAppender,
+    tech::ThermalCandidateParams,
     region::RegionParams)
 
     DuckDB.append(appender.techs, tech.name)
@@ -152,7 +170,10 @@ function store(
     DuckDB.append(appender.techs, nothing)
     DuckDB.end_row(appender.techs)
 
-    foreach(site -> store(appender, site, tech, region), tech.sites)
+    DuckDB.append(appender.sites, "")
+    DuckDB.append(appender.sites, tech.name)
+    DuckDB.append(appender.sites, region.name)
+    DuckDB.end_row(appender.sites)
 
 end
 

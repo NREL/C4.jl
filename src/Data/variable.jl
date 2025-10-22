@@ -34,6 +34,8 @@ struct VariableCandidateSiteParams
 
 end
 
+name(site::VariableCandidateSiteParams) = site.name
+
 struct VariableCandidateParams
 
     name::String

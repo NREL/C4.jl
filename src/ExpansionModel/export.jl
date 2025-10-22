@@ -84,19 +84,12 @@ function store(appender::ExpansionAppender, iter::Int, region::RegionExpansion)
 end
 
 function store(appender::ExpansionAppender, iter::Int,
-               tech::TechnologyExpansion, region::RegionExpansion)
-
-    foreach(site -> store(appender, iter, site, tech, region), tech.sites)
-
-end
-
-function store(appender::ExpansionAppender, iter::Int, site::ThermalSiteExpansion,
                tech::ThermalExpansion, region::RegionExpansion)
 
-    new_capacity = value(site.units_new) * tech.params.unit_size * powerunits_MW
+    new_capacity = value(tech.units_new) * tech.params.unit_size * powerunits_MW
 
     DuckDB.append(appender.sitebuilds, iter)
-    DuckDB.append(appender.sitebuilds, name(site))
+    DuckDB.append(appender.sitebuilds, "")
     DuckDB.append(appender.sitebuilds, name(tech))
     DuckDB.append(appender.sitebuilds, name(region))
     DuckDB.append(appender.sitebuilds, new_capacity)
@@ -105,16 +98,20 @@ function store(appender::ExpansionAppender, iter::Int, site::ThermalSiteExpansio
 
 end
 
+store(appender::ExpansionAppender, iter::Int,
+               tech::VariableExpansion, region::RegionExpansion) =
+    foreach(site -> store(appender, iter, site, tech, region), tech.sites)
+
 function store(appender::ExpansionAppender, iter::Int, site::VariableSiteExpansion,
                tech::VariableExpansion, region::RegionExpansion)
 
-    total_capacity = value(site.capacity_new) * powerunits_MW
+    new_capacity = value(site.capacity_new) * powerunits_MW
 
     DuckDB.append(appender.sitebuilds, iter)
-    DuckDB.append(appender.sitebuilds, name(site))
+    DuckDB.append(appender.sitebuilds, site.params.name)
     DuckDB.append(appender.sitebuilds, name(tech))
     DuckDB.append(appender.sitebuilds, name(region))
-    DuckDB.append(appender.sitebuilds, total_capacity)
+    DuckDB.append(appender.sitebuilds, new_capacity)
     DuckDB.append(appender.sitebuilds, nothing)
     DuckDB.end_row(appender.sitebuilds)
 

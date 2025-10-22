@@ -5,22 +5,26 @@ import JuMP: @variable, @constraint, @expression, @objective, value
 
 import  ..JuMP_GreaterThanConstraintRef, ..JuMP_LessThanConstraintRef,
         ..JuMP_ExpressionRef,
-        ..Site, ..ThermalSite, ..VariableSite,
+        ..Site, ..VariableSite,
         ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
         ..Interface, ..Region, ..System, ..varnames!,
         ..nameplatecapacity, ..availablecapacity, ..availability, ..maxpower, ..maxenergy,
         ..roundtrip_efficiency, ..operating_cost,
-        ..name, ..variabletechs, ..storagetechs, ..sites, ..cost, ..cost_generation,
+        ..name, ..variabletechs, ..storagetechs, ..thermaltechs,
+        ..sites, ..cost, ..cost_generation,
         ..region_from, ..region_to,
         ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
 
-import ..Data: VariableExistingParams, VariableExistingSiteParams,
-               StorageExistingParams, StorageExistingSiteParams
+import ..Data: ThermalExistingParams, ThermalCandidateParams,
+               VariableExistingParams, VariableExistingSiteParams,
+               VariableCandidateParams, VariableCandidateSiteParams,
+               StorageExistingParams, StorageCandidateParams
 
 using ..Data
 using ..AdequacyModel
 using ..DispatchModel
 
+include("thermal.jl")
 include("variable.jl")
 include("storage.jl")
 

@@ -47,7 +47,22 @@ availablecapacity(tech::VariableTechnology, t::Int) =
     sum(availablecapacity(site, t) for site in sites(tech); init=0)
 
 
-abstract type ThermalSite <: Site end
+"""
+`ThermalTechnology` is an abstract type that can be used to instantiate
+dispatch problems. Instances of `ThermalTechnology` should define:
+
+`name(tech::ThermalTechnology) -> AbstractString`
+Returns the technology name.
+
+`nameplatecapacity(tech::ThermalTechnology)`
+Returns installed capacity in `C4.powerunits_MW`.
+
+`availablecapacity(tech::ThermalTechnology, t::Int)`
+`Returns expected (average) available capacity in `C4.powerunits_MW`.
+
+`cost_generation(tech::ThermalTechnology) -> Float64`
+Returns the marginal generating cost of `tech` in units of \$/C4.powerunits_MW.
+"""
 abstract type ThermalTechnology <: Technology end
 
 """
@@ -78,13 +93,15 @@ dispatch problems. Instances of Region should define:
 ```
 name(::Region)
 demand(::Region, t::Int)
+thermaltechs(::Region) -> Vector{ThermalTechnology}
 variabletechs(::Region) -> Vector{VariableTechnology}
 storagetechs(::Region) -> Vector{StorageTechnology}
 ```
 """
-abstract type Region{TG<:ThermalTechnology, I<:Interface} end
+abstract type Region{I<:Interface} end
 
 function demand end
+function thermaltechs end
 function variabletechs end
 function storagetechs end
 function importinginterfaces end

@@ -7,8 +7,12 @@ function SystemParams(datadir::String)
 
     system = SystemParams(name, timesteps, regions, interfaces)
 
-    load_thermaltechs!(system, datadir)
-    load_thermalsites!(system, datadir)
+    thermaldir = joinpath(datadir, "thermal")
+
+    load_existing_thermaltechs!(system, thermaldir)
+    load_existing_thermalsites!(system, thermaldir)
+
+    load_candidate_thermaltechs!(system, thermaldir)
 
     variabledir = joinpath(datadir, "variable")
 
@@ -53,7 +57,8 @@ function load_regions(datadir::String)
 
         region = RegionParams(
             regionname, demand,
-            ThermalParams[],
+            ThermalExistingParams[],
+            ThermalCandidateParams[],
             VariableExistingParams[],
             VariableCandidateParams[],
             StorageExistingParams[],
@@ -103,44 +108,50 @@ function load_interfaces(datadir::String, regions::Vector{RegionParams})
 
 end
 
-function load_thermaltechs!(system::SystemParams, datadir::String)
+function load_existing_thermaltechs!(system::SystemParams, datadir::String)
 
     regions = regionset(system)
-    techspath = joinpath(datadir, "thermal/regiontechs.csv")
+    techspath = joinpath(datadir, "existing_techs.csv")
     validator = AddValidator{String}("region", regions, "tech", techspath)
     techs = readdlm(techspath, ',')
+
+    validate_columns(
+        techs, ["region", "tech", "category", "cost_generation"],
+        techspath)
 
     for r in 2:size(techs, 1)
 
         regionname = string(techs[r, 1])
         techname = string(techs[r, 2])
+        category = string(techs[r, 3])
 
         validate!(validator, regionname, techname)
 
-        cost_capital = Float64(techs[r, 3]) * powerunits_MW
         cost_generation = Float64(techs[r, 4]) * powerunits_MW
-        size = techs[r, 5] / powerunits_MW
 
-        tech = ThermalParams(
-            techname, cost_capital, cost_generation, size, ThermalSiteParams[])
+        tech = ThermalExistingParams(
+            techname, category, cost_generation, ThermalExistingSiteParams[])
 
         _, region = getbyname(system.regions, regionname)
-        push!(region.thermaltechs, tech)
+        push!(region.thermaltechs_existing, tech)
 
     end
 
 end
 
-function load_thermalsites!(system::SystemParams, datadir::String)
+function load_existing_thermalsites!(system::SystemParams, datadir::String)
 
     n_timesteps = length(system.timesteps)
 
-    regiontechs = regiontechset(system, ThermalParams)
-    sitespath = joinpath(datadir, "thermal/sites.csv")
+    regiontechs = regiontechset(system, ThermalExistingParams)
+    sitespath = joinpath(datadir, "existing_sites.csv")
     validator = AddValidator{String}(
         "region-technology pair", regiontechs, "site", sitespath)
 
     sites = readdlm(sitespath, ',')
+
+    validate_columns(sites,
+        ["region", "tech", "site", "units", "unit_size"], sitespath)
 
     for r in 2:size(sites, 1)
 
@@ -150,29 +161,79 @@ function load_thermalsites!(system::SystemParams, datadir::String)
 
         validate!(validator, (regionname, techname), sitename)
 
-        units_existing = Int(sites[r, 4])
-        units_new_max = Int(sites[r, 5])
+        units = Int(sites[r, 4])
+        unit_size = Float64(sites[r, 5]) / powerunits_MW
 
-        site = ThermalSiteParams(
-            sitename, units_existing, units_new_max,
+        site = ThermalExistingSiteParams(
+            sitename, units, unit_size,
             ones(n_timesteps), zeros(n_timesteps), ones(n_timesteps))
 
-        tech = get_tech(system, ThermalParams, regionname, techname)
+        tech = get_tech(system, ThermalExistingParams, regionname, techname)
         push!(tech.sites, site)
 
     end
 
-    ratingpath = joinpath(datadir, "thermal/rating.csv")
-    load_sites_timeseries!(system, ThermalParams, ratingpath,
+    ratingpath = joinpath(datadir, "existing_rating.csv")
+    load_sites_timeseries!(system, ThermalExistingParams, ratingpath,
         :rating, x -> x < 0.01 ? 0. : x)
 
-    mttfpath = joinpath(datadir, "thermal/mttf.csv")
-    load_sites_timeseries!(system, ThermalParams, mttfpath, :λ, x -> 1/x)
+    mttfpath = joinpath(datadir, "existing_mttf.csv")
+    load_sites_timeseries!(system, ThermalExistingParams, mttfpath, :λ, x -> 1/x)
 
-    mttrpath = joinpath(datadir, "thermal/mttr.csv")
-    load_sites_timeseries!(system, ThermalParams, mttrpath, :μ, x -> 1/x)
+    mttrpath = joinpath(datadir, "existing_mttr.csv")
+    load_sites_timeseries!(system, ThermalExistingParams, mttrpath, :μ, x -> 1/x)
 
 end
+
+function load_candidate_thermaltechs!(system::SystemParams, datadir::String)
+
+    n_timesteps = length(system.timesteps)
+
+    regions = regionset(system)
+    techspath = joinpath(datadir, "candidate_techs.csv")
+    validator = AddValidator{String}("region", regions, "tech", techspath)
+    techs = readdlm(techspath, ',')
+
+    validate_columns(techs,
+        ["region", "tech", "category",
+         "cost_capital", "cost_generation", "unit_size", "max_units"],
+        techspath)
+
+    for r in 2:size(techs, 1)
+
+        regionname = string(techs[r, 1])
+        techname = string(techs[r, 2])
+        category = string(techs[r, 3])
+
+        validate!(validator, regionname, techname)
+
+        cost_capital = Float64(techs[r, 4]) * powerunits_MW
+        cost_generation = Float64(techs[r, 5]) * powerunits_MW
+        unit_size = Float64(techs[r, 6]) / powerunits_MW
+        max_units = Int(techs[r, 7])
+
+        tech = ThermalCandidateParams(
+            techname, category, cost_generation, cost_capital,
+            max_units, unit_size,
+            ones(n_timesteps), zeros(n_timesteps), ones(n_timesteps))
+
+        _, region = getbyname(system.regions, regionname)
+        push!(region.thermaltechs_candidate, tech)
+
+    end
+
+    ratingpath = joinpath(datadir, "candidate_rating.csv")
+    load_techs_timeseries!(system, ThermalCandidateParams, ratingpath,
+        :rating, x -> x < 0.01 ? 0. : x)
+
+    mttfpath = joinpath(datadir, "candidate_mttf.csv")
+    load_techs_timeseries!(system, ThermalCandidateParams, mttfpath, :λ, x -> 1/x)
+
+    mttrpath = joinpath(datadir, "candidate_mttr.csv")
+    load_techs_timeseries!(system, ThermalCandidateParams, mttrpath, :μ, x -> 1/x)
+
+end
+
 
 function load_existing_variabletechs!(system::SystemParams, datadir::String)
 
@@ -419,6 +480,39 @@ function load_candidate_storagetechs!(system::SystemParams, datadir::String)
 
         _, region = getbyname(system.regions, regionname)
         push!(region.storagetechs_candidate, tech)
+
+    end
+
+end
+
+function load_techs_timeseries!(
+    system::SystemParams, techtype::Type{<:TechnologyParams},
+    datapath::String, field::Symbol, transformer::Function=identity
+)
+
+    validator = UpdateValidator(
+        "region-technology pair",
+        datapath,
+        regiontechset(system, techtype)
+    )
+
+    data = readdlm(datapath, ',')
+
+    timesteps = DateTime.(data[3:end, 1], dateformat"y-m-dTH:M:S.s")
+    timesteps == system.timesteps ||
+        error("Timestamps in $datapath are not consistent with demand data")
+
+    for c in 2:size(data, 2)
+
+        regionname = string(data[1, c])
+        techname = string(data[2, c])
+
+        validate!(validator, (regionname, techname))
+
+        tech = get_tech(
+            system, techtype, regionname, techname)
+
+        getfield(tech, field) .= transformer.(Float64.(data[3:end, c]))
 
     end
 
