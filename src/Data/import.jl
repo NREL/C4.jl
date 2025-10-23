@@ -213,7 +213,7 @@ function load_candidate_thermaltechs!(system::SystemParams, datadir::String)
         max_units = Int(techs[r, 7])
 
         tech = ThermalCandidateParams(
-            techname, category, cost_capital, cost_generation,
+            techname, category, cost_generation, cost_capital,
             max_units, unit_size,
             ones(n_timesteps), zeros(n_timesteps), ones(n_timesteps))
 
