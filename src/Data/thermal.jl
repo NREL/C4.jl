@@ -3,7 +3,6 @@ struct ThermalExistingSiteParams
     name::String
 
     units::Int
-    unit_size::Float64 # MW/unit
 
     rating::Vector{Float64}
 
@@ -27,6 +26,12 @@ struct ThermalExistingParams <: ThermalTechnology
     category::String
 
     cost_generation::Float64 # $/MWh
+
+    min_gen::Float64 # MW/unit
+    unit_size::Float64 # MW/unit
+    max_ramp::Float64 # MW/hour
+    min_uptime::Int # hours
+    min_downtime::Int # hours
 
     sites::Vector{ThermalExistingSiteParams}
 
