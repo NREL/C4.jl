@@ -36,7 +36,6 @@ function ThermalExistingParams(tech::ThermalExpansion)
     new_site = ThermalExistingSiteParams(
         "",
         new_units,
-        params.unit_size,
         params.rating,
         params.λ,
         params.μ)
@@ -45,6 +44,12 @@ function ThermalExistingParams(tech::ThermalExpansion)
         params.name,
         params.category,
         params.cost_generation,
+        params.cost_startup,
+        params.unit_size,
+        params.min_gen,
+        params.max_ramp,
+        params.min_uptime,
+        params.min_downtime,
         [new_site])
 
 end
@@ -58,9 +63,14 @@ function ThermalCandidateParams(tech::ThermalExpansion)
         params.name,
         params.category,
         params.cost_generation,
+        params.cost_startup,
         params.cost_capital,
         params.max_units - new_units,
         params.unit_size,
+        params.min_gen,
+        params.max_ramp,
+        params.min_uptime,
+        params.min_downtime,
         params.rating,
         params.λ,
         params.μ)

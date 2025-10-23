@@ -1,3 +1,3 @@
-region,tech,site,units,unit_size
-A,Gas CC,Region A Gas CC,1,355
-C,Gas CT,Region C Gas CT,1,55
+region,tech,site,units
+A,Gas CC,Region A Gas CC,1
+C,Gas CT,Region C Gas CT,1

@@ -1,3 +1,3 @@
-region,tech,category,cost_generation
-A,Gas CC,Gas CC,20
-C,Gas CT,Gas CT,30
+region,tech,category,cost_generation,cost_startup,unit_size,min_gen,max_ramp,min_uptime,min_downtime
+A,Gas CC,Gas CC,20,26623.4,355,170,250,8,5
+C,Gas CT,Gas CT,30,5377.8,55,22,222,3,3
