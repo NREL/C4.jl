@@ -1,7 +1,7 @@
-region,tech,category,cost_capital,cost_generation,unit_size,max_units
-A,New Gas CT,Gas CT,80000,30,55,10
-B,New Gas CT,Gas CT,80000,30,55,10
-C,New Gas CT,Gas CT,80000,30,55,10
-A,New Gas CC,Gas CC,93400,20,355,10
-B,New Gas CC,Gas CC,93400,20,355,10
-C,New Gas CC,Gas CC,93400,20,355,10
+region,tech,category,cost_generation,cost_startup,cost_capital,max_units,unit_size,min_gen,max_ramp,min_uptime,min_downtime
+A,New Gas CT,Gas CT,30,5377.8,80000,10,55,22,222,3,3
+B,New Gas CT,Gas CT,30,5377.8,80000,10,55,22,222,3,3
+C,New Gas CT,Gas CT,30,5377.8,80000,10,55,22,222,3,3
+A,New Gas CC,Gas CC,20,26623.4,93400,10,355,170,250,8,5
+B,New Gas CC,Gas CC,20,26623.4,93400,10,355,170,250,8,5
+C,New Gas CC,Gas CC,20,26623.4,93400,10,355,170,250,8,5

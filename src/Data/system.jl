@@ -194,11 +194,9 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
             println(io, "\t(No resources)")
 
         for thermaltech in region.thermaltechs_existing
-            println(io, "\t", thermaltech.name, ":")
-            for site in thermaltech.sites
-                println(io, "\t\t", site.name, ": ",
-                        site.units, " x ", site.unit_size * powerunits_MW, " MW")
-            end
+            n_units = sum(site.units for site in thermaltech.sites)
+            println(io, "\t", thermaltech.name, ": ",
+                        n_units, " x ", thermaltech.unit_size * powerunits_MW, " MW")
         end
 
         for variabletech in region.variabletechs_existing

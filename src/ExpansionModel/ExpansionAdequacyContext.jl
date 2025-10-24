@@ -36,7 +36,7 @@ function ExpansionAdequacyContext(
 
         for tech in region.params.thermaltechs_existing
             for site in tech.sites
-                capacity = site.units * site.unit_size
+                capacity = site.units * tech.unit_size
                 available_capacity[r, :] .+= capacity .* availability.(Ref(site), 1:T)
             end
         end

@@ -63,13 +63,14 @@ function load_generators(sys::SystemParams, meta)
         g_first = g_last + 1
 
         for tech in region.thermaltechs_existing
+            unit_size = tech.unit_size * powerunits_MW
             for site in tech.sites
                 sitename = join([region.name, tech.name, site.name], "_")
                 for i in 1:site.units
                     g_last += 1
                     names[g_last] = sitename * "_$i"
                     categories[g_last] = tech.name
-                    capacity[g_last, :] .= round.(Int, site.rating .* site.unit_size .* powerunits_MW)
+                    capacity[g_last, :] .= round.(Int, site.rating .* unit_size)
                     lambda[g_last, :] .= site.λ
                     mu[g_last, :] .= site.μ
                 end
