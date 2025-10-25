@@ -69,7 +69,7 @@ region_neues(result::AdequacyResult) =
 
 function solve(prob::AdequacyProblem)
 
-    simspec = SequentialMonteCarlo(samples=prob.samples, seed=1)
+    simspec = SequentialMonteCarlo(samples=prob.samples, seed=1, verbose=false)
     sf, = assess(prob.prassys, simspec, Shortfall())
 
     # TODO: Make this optional
