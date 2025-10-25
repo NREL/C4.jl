@@ -151,16 +151,16 @@ function load_thermalsites!(system::SystemParams, datadir::String, ram_type::Str
 
     end
 
-    ratingpath = joinpath(datadir, "thermal/rating.csv")
-    load_sites_timeseries!(system, ThermalParams, ratingpath,
-        :rating, x -> x < 0.01 ? 0. : x)
-
     if ram_type == "time_dep"
-        mttfpath = joinpath(datadir, "thermal/time_dep_mttf.csv")    
-        mttrpath = joinpath(datadir, "thermal/time_dep_mttr.csv")
+        mttfpath = joinpath(datadir, "thermal", "time_dep_mttf.csv")    
+        mttrpath = joinpath(datadir, "thermal", "time_dep_mttr.csv")
+        # load time-dep deratings for time-dep RAM
+        ratingpath = joinpath(datadir, "thermal", "rating.csv")
+        load_sites_timeseries!(system, ThermalParams, ratingpath,
+        :rating, x -> x < 0.01 ? 0. : x)
     else
-        mttfpath = joinpath(datadir, "thermal/mttf.csv")    
-        mttrpath = joinpath(datadir, "thermal/mttr.csv")
+        mttfpath = joinpath(datadir, "thermal", "mttf.csv")    
+        mttrpath = joinpath(datadir, "thermal", "mttr.csv")
     end
 
     load_sites_timeseries!(system, ThermalParams, mttfpath, :λ, x -> 1/x)
