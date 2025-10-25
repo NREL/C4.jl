@@ -124,10 +124,10 @@ struct DispatchSequence{D <: SystemDispatch}
     # list of dispatches, but need to parametrize the result with
     # EconomicDispatch{S,R,I}.
     function DispatchSequence(
-        f::Type{D}, m::JuMP.Model, system::S, time::TimeProxyAssignment
+        f::Type{D}, m::JuMP.Model, system::S, time::TimeProxyAssignment, voll::Float64=NaN
     ) where {R, I, D <: SystemDispatch, S <: System{R,I}}
 
-        dispatches = [f(m, system, period) for period in time.periods]
+        dispatches = [f(m, system, period, voll) for period in time.periods]
         recurrences = sequence_recurrences(m, system, dispatches, time)
         new{D{S,R,I}}(time, dispatches, recurrences)
 

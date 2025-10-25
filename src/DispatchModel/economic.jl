@@ -5,6 +5,8 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
     storagetechs::Vector{StorageDispatch{ST,SS}}
 
     netload::Vector{JuMP_ExpressionRef}
+    unserved_energy::Union{Vector{JuMP.VariableRef},Nothing}
+    voll::Float64
 
     import_interfaces::Vector{InterfaceDispatch{I}}
     export_interfaces::Vector{InterfaceDispatch{I}}
@@ -15,7 +17,7 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
         m::JuMP.Model,
         region::R,
         interfaces::Vector{InterfaceDispatch{I}},
-        period::TimePeriod
+        period::TimePeriod, voll::Float64
     ) where {TG, VG, ST, SS, I, R<:Region{TG,VG,ST,SS,I} }
 
         T = length(period)
@@ -30,18 +32,22 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
         storagedispatch = [StorageDispatch(m, region, tech, period)
                            for tech in region.storagetechs]
 
+        unserved_energy = isnan(voll) ? nothing : @variable(m, [1:T], lower_bound=0)
+
         netload = @expression(m, [t in 1:T],
                 demand(region, ts[t])
                 - sum(gen.dispatch[t] for gen in thermaldispatch)
                 - sum(gen.dispatch[t] for gen in variabledispatch)
-                - sum(stor.dispatch[t] for stor in storagedispatch))
+                - sum(stor.dispatch[t] for stor in storagedispatch)
+                - (isnan(voll) ? 0 : unserved_energy[t]))
 
         import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
         export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
         new{R,TG,VG,ST,SS,I}(
             thermaldispatch, variabledispatch, storagedispatch,
-            netload, import_interfaces, export_interfaces, region)
+            netload, unserved_energy, voll,
+            import_interfaces, export_interfaces, region)
 
     end
 
@@ -50,7 +56,8 @@ end
 cost(dispatch::RegionEconomicDispatch) =
     sum(cost(thermaltech) for thermaltech in dispatch.thermaltechs; init=0) +
     sum(cost(variabletech) for variabletech in dispatch.variabletechs; init=0) +
-    sum(cost(storagetech) for storagetech in dispatch.storagetechs; init=0)
+    sum(cost(storagetech) for storagetech in dispatch.storagetechs; init=0) +
+    (isnan(dispatch.voll) ? 0 : sum(dispatch.unserved_energy) * (dispatch.voll * powerunits_MW))
 
 struct EconomicDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch{S}
 
@@ -65,7 +72,7 @@ struct EconomicDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch{S}
     system::S
 
     function EconomicDispatch(
-        m::JuMP.Model, system::S, period::TimePeriod
+        m::JuMP.Model, system::S, period::TimePeriod, voll::Float64
     ) where { R<:Region, I<:Interface, S<:System{R,I} }
 
         n_timesteps = length(period)
@@ -74,7 +81,7 @@ struct EconomicDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch{S}
         interfaces = [InterfaceDispatch(m, iface, period)
                    for iface in system.interfaces]
 
-        regions = [RegionEconomicDispatch(m, region, interfaces, period)
+        regions = [RegionEconomicDispatch(m, region, interfaces, period, voll)
                    for region in system.regions]
 
         netimports = @expression(m, [r in 1:n_regions, t in 1:n_timesteps],

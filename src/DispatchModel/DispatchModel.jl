@@ -12,7 +12,7 @@ import ..GeneratorTechnology, ..StorageTechnology, ..StorageSite,
        ..availablecapacity, ..maxpower, ..maxenergy,
        ..roundtrip_efficiency, ..operating_cost,
        ..name, ..cost, ..cost_generation, ..demand, ..region_from, ..region_to,
-       ..importinginterfaces, ..exportinginterfaces, ..solve!
+       ..importinginterfaces, ..exportinginterfaces, ..solve!, ..powerunits_MW
 
 using ..Data
 
@@ -35,7 +35,7 @@ struct DispatchProblem{D<:DispatchSequence}
 
     function DispatchProblem(
         system::SystemParams, D::Type{<:SystemDispatch},
-        periods::TimeProxyAssignment, optimizer
+        periods::TimeProxyAssignment, optimizer, voll::Float64=NaN
     )
 
         n_timesteps = length(system.timesteps)
@@ -45,7 +45,7 @@ struct DispatchProblem{D<:DispatchSequence}
 
         m = JuMP.direct_model(optimizer)
 
-        dispatch = DispatchSequence(D, m, system, periods)
+        dispatch = DispatchSequence(D, m, system, periods, voll)
 
         opex_scalar = 8766 / n_timesteps
         @objective(m, Min, opex_scalar * cost(dispatch))

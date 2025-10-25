@@ -30,6 +30,8 @@ timestamp = Dates.format(now(), "yyyymmddHHMMSS")
 fullchrono = fullchronologyperiods(sys, daylength=2)
 repeatedchrono = singleperiod(sys, daylength=2)
 
+voll = 9000.
+
 # Note that ExpansionProblem takes its target in terms of
 # unnormalized EUE and powerunits_MW!
 # Nonzero values need to be scaled appropriately
@@ -161,7 +163,7 @@ show_neues(ram_results)
 println("\nIterative CEM:")
 cem, ram, pcm = iterate_ra_cem(
     sys, fullchrono, max_neues, optimizer,
-    outfile=timestamp * ".db", check_dispatch=true)
+    outfile=timestamp * ".db", check_dispatch=true, check_dispatch_voll=voll)
 
 sys_built = SystemParams(cem)
 display(sys_built)
@@ -179,6 +181,6 @@ pcm = DispatchProblem(sys_built, ReliabilityDispatch, fullchrono, optimizer)
 solve!(pcm)
 println("Operating Cost (Reliability): ", value(cost(pcm)))
 
-pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
+pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer, voll)
 solve!(pcm)
 println("Operating Cost (Economic): ", value(cost(pcm)))

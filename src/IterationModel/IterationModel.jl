@@ -7,16 +7,8 @@ using C4.ExpansionModel
 
 import ..store, ..powerunits_MW
 import C4.ExpansionModel: RiskEstimateParams, RiskEstimatePeriodParams,
-                          RiskEstimatePlaneParams, ThermalTechRiskEstimateParams,
-                          ThermalSiteRiskEstimateParams,
-                          ThermalRegionUnitCount, ThermalTechUnitCount,
-                          ThermalSiteUnitCount
+                          RiskEstimatePlaneParams
 
-import C4.AdequacyModel: ThermalRegionAdequacyImpact,
-                         ThermalTechAdequacyImpact,
-                         ThermalSiteAdequacyImpact
-
-import Base: +
 import Dates: Date, now
 import DBInterface
 import DelimitedFiles: writedlm
@@ -32,7 +24,7 @@ function iterate_ra_cem(
     nsamples::Int=1000, skip_existing_stress_periods::Bool=false,
     timeout::Float64=Inf, first_feasible::Bool=true,
     aspp::Bool=true, endog_risk::Bool=true, outfile::String="",
-    check_dispatch::Bool=false)
+    check_dispatch::Bool=false, check_dispatch_voll::Float64=NaN)
 
     persist = length(outfile) > 0
     max_neue = maximum(max_neues)
@@ -45,7 +37,7 @@ function iterate_ra_cem(
 
     ram_start = now()
     ram = AdequacyProblem(sys, samples=nsamples)
-    ram_result = solve(ram) # TODO: Skip the thermal sensitivities
+    ram_result = solve(ram)
     ram_end = now()
 
     show_neues(ram_result)
@@ -151,7 +143,8 @@ function iterate_ra_cem(
         pcm_start = now()
         n_iters += 1
         fullchrono = fullchronologyperiods(sys_built, daylength=base_chronology.daylength)
-        pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono, optimizer)
+        pcm = DispatchProblem(sys_built, EconomicDispatch, fullchrono,
+                              optimizer, check_dispatch_voll)
         solve!(pcm)
         pcm_end = now()
 
@@ -229,99 +222,38 @@ function RiskEstimatePeriodParams(
     p::Int
 )
 
-    R = length(first(adequacycontexts).thermal_units)
+    R = size(first(adequacycontexts).available_capacity, 1)
     T = time.daylength
     J = length(adequacycontexts)
 
     representative_ts = time.periods[p].timesteps
     represented_ts = represented_timeslices(time, p)
 
-    thermalparams = Matrix{Vector{ThermalTechRiskEstimateParams}}(undef, R, T)
     planes = Array{RiskEstimatePlaneParams,3}(undef, R, T, J)
 
     for (j, adequacycontext) in enumerate(adequacycontexts)
 
         shortfalls = adequacycontext.adequacy.shortfalls
 
-        nonthermal_availablecapacity =
-            adequacycontext.nonthermal_availability[:, representative_ts]
+        availablecapacity =
+            adequacycontext.available_capacity[:, representative_ts]
 
         base_eue = zeros(R,T)
-        nonthermal_dEUE = zeros(R,T)
+        dEUE = zeros(R,T)
 
         for ts in represented_ts
             base_eue .+= shortfalls.shortfall_mean[:, ts] ./ powerunits_MW
-            nonthermal_dEUE .+= shortfalls.eventperiod_regionperiod_mean[:, ts]
-        end
-
-        for r in 1:R
-
-            aggregate_impacts = ThermalRegionAdequacyImpact(
-                adequacycontext.adequacy.thermalimpacts[r], time, p)
-
-            for t in 1:T
-                thermalparams[r,t] = riskparams(
-                    adequacycontext.thermal_units[r],
-                    aggregate_impacts, base_eue, r, t)
-            end
-
+            dEUE .+= shortfalls.eventperiod_regionperiod_mean[:, ts]
         end
 
         planes[:,:,j] .= RiskEstimatePlaneParams.(
-            base_eue, nonthermal_availablecapacity,
-            nonthermal_dEUE, thermalparams)
+            base_eue, availablecapacity, dEUE)
 
     end
 
     return planes
 
 end
-
-riskparams(
-    unitcounts::ThermalRegionUnitCount,
-    adequacyimpact::ThermalRegionAdequacyImpact,
-    base_eue::Matrix{Float64}, r::Int, t::Int
-) = riskparams.(unitcounts.techs, adequacyimpact.techs, Ref(base_eue), r, t)
-
-riskparams(
-    unitcounts::ThermalTechUnitCount,
-    adequacyimpact::ThermalTechAdequacyImpact,
-    base_eue::Matrix{Float64}, r::Int, t::Int
-) = ThermalTechRiskEstimateParams(
-    riskparams.(unitcounts.sites, adequacyimpact.sites, Ref(base_eue), r, t))
-
-riskparams(
-    unitcount::ThermalSiteUnitCount,
-    adequacyimpact::ThermalSiteAdequacyImpact,
-    base_eue::Matrix{Float64}, r::Int, t::Int
-) = ThermalSiteRiskEstimateParams(unitcount.units, base_eue[r,t] - adequacyimpact.eue[r,t])
-
-"""
-Collapse a full chronology ThermalRegionAdequacyImpact down into an aggregated
-ThermalRegionAdequacyImpact, for a specific period p from the provided
-TimeProxyAssignment
-"""
-ThermalRegionAdequacyImpact(
-    region::ThermalRegionAdequacyImpact, time::TimeProxyAssignment, p::Int
-) = sum(extract_timeslice(region, ts) for ts in represented_timeslices(time, p))
-
-extract_timeslice(region::ThermalRegionAdequacyImpact, ts::UnitRange{Int}) =
-    ThermalRegionAdequacyImpact(extract_timeslice.(region.techs, Ref(ts)))
-
-extract_timeslice(tech::ThermalTechAdequacyImpact, ts::UnitRange{Int}) =
-    ThermalTechAdequacyImpact(extract_timeslice.(tech.sites, Ref(ts)))
-
-extract_timeslice(site::ThermalSiteAdequacyImpact, ts::UnitRange{Int}) =
-    ThermalSiteAdequacyImpact(site.eue[:, ts])
-
-+(s1::ThermalRegionAdequacyImpact, s2::ThermalRegionAdequacyImpact) =
-    ThermalRegionAdequacyImpact(s1.techs + s2.techs)
-
-+(s1::ThermalTechAdequacyImpact, s2::ThermalTechAdequacyImpact) =
-    ThermalTechAdequacyImpact(s1.sites + s2.sites)
-
-+(s1::ThermalSiteAdequacyImpact, s2::ThermalSiteAdequacyImpact) =
-    ThermalSiteAdequacyImpact(s1.eue + s2.eue)
 
 function represented_timeslices(time::TimeProxyAssignment, p::Int)
     T = time.daylength
