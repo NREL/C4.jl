@@ -2,9 +2,14 @@
 struct ThermalDispatch{G<:ThermalTechnology}
 
     dispatch::Vector{JuMP.VariableRef}
+    units_committed::Vector{JuMP.VariableRef}
+
+    units_committed_max::Vector{JuMP_LessThanConstraintRef}
     dispatch_max::Vector{JuMP_LessThanConstraintRef}
+    dispatch_min::Vector{JuMP_LessThanConstraintRef}
     ramp_up_max::Vector{JuMP_LessThanConstraintRef}
     ramp_down_max::Vector{JuMP_LessThanConstraintRef}
+
     tech::G
 
     function ThermalDispatch(
@@ -15,20 +20,30 @@ struct ThermalDispatch{G<:ThermalTechnology}
         T = length(period)
         ts = period.timesteps
 
-        dispatch = @variable(m, [1:T], lower_bound = 0)
         fullname = join([name(region), name(tech), period.name], ",")
+
+        dispatch = @variable(m, [1:T], lower_bound = 0)
         varnames!(dispatch, "tech_dispatch[$(fullname)]", 1:T)
 
+        units_committed = @variable(m, [1:T], integer=true, lower_bound = 0)
+        varnames!(units_committed, "tech_units_committed[$(fullname)]", 1:T)
+
+        units_committed_max = @constraint(m, [t in 1:T],
+            units_committed[t] <= num_units(tech))
+
         dispatch_max = @constraint(m, [t in 1:T],
-            dispatch[t] <= availablecapacity(tech, ts[t]))
+            dispatch[t] <= unit_size(tech) * units_committed[t])
+
+        dispatch_min = @constraint(m, [t in 1:T],
+            min_gen(tech) * units_committed[t] <= dispatch[t])
 
         ramp_up_max = @constraint(m, [t in 1:T],
-            dispatch[t] - dispatch[prev_t(t, T)] <= max_ramp(tech))
+            dispatch[t] - dispatch[prev_t(t, T)] <= max_unit_ramp(tech) * units_committed[t])
 
         ramp_down_max = @constraint(m, [t in 1:T],
-            dispatch[prev_t(t, T)] - dispatch[t] <= max_ramp(tech))
+            dispatch[prev_t(t, T)] - dispatch[t] <= max_unit_ramp(tech) * units_committed[t])
 
-        return new{G}(dispatch, dispatch_max, ramp_up_max, ramp_down_max, tech)
+        return new{G}(dispatch, units_committed, units_committed_max, dispatch_max, dispatch_min, ramp_up_max, ramp_down_max, tech)
 
     end
 
@@ -40,6 +55,8 @@ cost(dispatch::ThermalDispatch) =
 name(dispatch::ThermalDispatch) = name(dispatch.tech)
 
 prev_t(t::Int, T::Int) = t == 1 ? T : t - 1
+
+
 struct StorageDispatch{S<:StorageTechnology}
 
     charge::Vector{JuMP.VariableRef}
