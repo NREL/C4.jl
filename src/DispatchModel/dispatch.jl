@@ -3,7 +3,8 @@ struct ThermalDispatch{G<:ThermalTechnology}
 
     dispatch::Vector{JuMP.VariableRef}
     dispatch_max::Vector{JuMP_LessThanConstraintRef}
-
+    ramp_up_max::Vector{JuMP_LessThanConstraintRef}
+    ramp_down_max::Vector{JuMP_LessThanConstraintRef}
     tech::G
 
     function ThermalDispatch(
@@ -21,7 +22,13 @@ struct ThermalDispatch{G<:ThermalTechnology}
         dispatch_max = @constraint(m, [t in 1:T],
             dispatch[t] <= availablecapacity(tech, ts[t]))
 
-        return new{G}(dispatch, dispatch_max, tech)
+        ramp_up_max = @constraint(m, [t in 1:T],
+            dispatch[t] - dispatch[prev_t(t, T)] <= max_ramp(tech))
+
+        ramp_down_max = @constraint(m, [t in 1:T],
+            dispatch[prev_t(t, T)] - dispatch[t] <= max_ramp(tech))
+
+        return new{G}(dispatch, dispatch_max, ramp_up_max, ramp_down_max, tech)
 
     end
 
@@ -32,6 +39,7 @@ cost(dispatch::ThermalDispatch) =
 
 name(dispatch::ThermalDispatch) = name(dispatch.tech)
 
+prev_t(t::Int, T::Int) = t == 1 ? T : t - 1
 struct StorageDispatch{S<:StorageTechnology}
 
     charge::Vector{JuMP.VariableRef}
