@@ -7,7 +7,7 @@ import Base: length
 import ..VariableSite, ..Technology,
        ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..Interface, ..Region, ..System, ..cost_generation,
-       ..maxpower, ..maxenergy, ..roundtrip_efficiency, ..operating_cost, ..max_ramp,
+       ..maxpower, ..maxenergy, ..roundtrip_efficiency, ..operating_cost, ..max_unit_ramp, ..num_units, ..unit_size, ..min_gen,
        ..name, ..variabletechs, ..storagetechs, ..thermaltechs,
        ..sites, ..availability, ..nameplatecapacity, ..availablecapacity,
        ..region_from, ..region_to,
