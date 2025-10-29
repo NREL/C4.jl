@@ -11,7 +11,8 @@ import  ..JuMP_GreaterThanConstraintRef, ..JuMP_LessThanConstraintRef,
         ..nameplatecapacity, ..availablecapacity, ..availability, ..maxpower, ..maxenergy,
         ..roundtrip_efficiency, ..operating_cost,
         ..name, ..variabletechs, ..storagetechs, ..thermaltechs,
-        ..sites, ..cost, ..cost_generation, ..max_unit_ramp, ..num_units, ..unit_size, ..min_gen,
+        ..sites, ..cost, ..cost_generation, ..cost_startup, ..max_unit_ramp, ..num_units, ..unit_size, ..min_gen,
+        ..min_uptime, ..min_downtime,
         ..region_from, ..region_to,
         ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
 
