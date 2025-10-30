@@ -7,9 +7,6 @@ function SystemParams(datadir::String, ram_type::String)
     interfaces = load_interfaces(datadir, regions)
     system = SystemParams(name, timesteps, regions, interfaces)
 
-    # load_thermaltechs!(system, datadir)
-    # load_thermalsites!(system, datadir, ram_type)
-
     thermaldir = joinpath(datadir, "thermal")
 
     load_existing_thermaltechs!(system, thermaldir, ram_type)
