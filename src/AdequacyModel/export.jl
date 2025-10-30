@@ -36,7 +36,6 @@ function DuckDB.close(appender::AdequacyAppender)
     return
 end
 
-# TODO: Store region x hourly EUE results (for heatmaps, etc)
 function store(con::DBInterface.Connection, iter::Int, result::AdequacyResult)
 
     DBInterface.execute(con, "CREATE TABLE IF NOT EXISTS adequacies (

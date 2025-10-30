@@ -97,9 +97,15 @@ function num_features(sys::SystemParams)
     techs = Set{String}()
 
     for region in sys.regions
-        for tech in region.variabletechs
+
+        for tech in region.variabletechs_existing
             push!(techs, tech.name)
         end
+
+        for tech in region.variabletechs_candidate
+            push!(techs, tech.name)
+        end
+
     end
 
     return length(techs) + 1 # One extra feature for demand
@@ -119,7 +125,19 @@ function extract_features(sys::SystemParams, n_features::Int, ts::UnitRange{Int}
 
         demand += mean(region.demand[ts])
 
-        for tech in region.variabletechs
+        for tech in region.variabletechs_existing
+
+            haskey(tech_cfs, tech.name) ||
+                (tech_cfs[tech.name] = Float64[])
+
+            for site in tech.sites
+                site_cf = mean(site.availability[ts])
+                push!(tech_cfs[tech.name], site_cf)
+            end
+
+        end
+
+        for tech in region.variabletechs_candidate
 
             haskey(tech_cfs, tech.name) ||
                 (tech_cfs[tech.name] = Float64[])

@@ -1,8 +1,9 @@
-struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
+struct RegionEconomicDispatch{R,I} <: RegionDispatch{R}
 
-    thermaltechs::Vector{GeneratorDispatch{TG}}
-    variabletechs::Vector{GeneratorDispatch{VG}}
-    storagetechs::Vector{StorageDispatch{ST,SS}}
+     # Note these vectors are heterogenously typed
+    thermaltechs::Vector{ThermalDispatch}
+    variabletechs::Vector{VariableDispatch}
+    storagetechs::Vector{StorageDispatch}
 
     netload::Vector{JuMP_ExpressionRef}
     unserved_energy::Union{Vector{JuMP.VariableRef},Nothing}
@@ -18,19 +19,19 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
         region::R,
         interfaces::Vector{InterfaceDispatch{I}},
         period::TimePeriod, voll::Float64
-    ) where {TG, VG, ST, SS, I, R<:Region{TG,VG,ST,SS,I} }
+    ) where {I, R<:Region{I} }
 
         T = length(period)
         ts = period.timesteps
 
-        thermaldispatch = [GeneratorDispatch(m, region, tech, period)
-                           for tech in region.thermaltechs]
+        thermaldispatch = [ThermalDispatch(m, region, tech, period)
+                           for tech in thermaltechs(region)]
 
-        variabledispatch = [GeneratorDispatch(m, region, tech, period)
-                            for tech in region.variabletechs]
+        variabledispatch = [VariableDispatch(m, region, tech, period)
+                            for tech in variabletechs(region)]
 
         storagedispatch = [StorageDispatch(m, region, tech, period)
-                           for tech in region.storagetechs]
+                           for tech in storagetechs(region)]
 
         unserved_energy = isnan(voll) ? nothing : @variable(m, [1:T], lower_bound=0)
 
@@ -44,7 +45,7 @@ struct RegionEconomicDispatch{R,TG,VG,ST,SS,I} <: RegionDispatch{R}
         import_interfaces = [interfaces[i] for i in importinginterfaces(region)]
         export_interfaces = [interfaces[i] for i in exportinginterfaces(region)]
 
-        new{R,TG,VG,ST,SS,I}(
+        new{R,I}(
             thermaldispatch, variabledispatch, storagedispatch,
             netload, unserved_energy, voll,
             import_interfaces, export_interfaces, region)

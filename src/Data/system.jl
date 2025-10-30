@@ -17,18 +17,20 @@ availablecapacity(iface::InterfaceParams) = iface.capacity_existing
 region_from(iface::InterfaceParams) = iface.region_from
 region_to(iface::InterfaceParams) = iface.region_to
 
-struct RegionParams <: Region{
-    ThermalParams, VariableParams,
-    StorageParams, StorageSiteParams, InterfaceParams
-}
+struct RegionParams <: Region{InterfaceParams}
 
     name::String
 
     demand::Vector{Float64}
 
-    thermaltechs::Vector{ThermalParams}
-    variabletechs::Vector{VariableParams}
-    storagetechs::Vector{StorageParams}
+    thermaltechs_existing::Vector{ThermalExistingParams}
+    thermaltechs_candidate::Vector{ThermalCandidateParams}
+
+    variabletechs_existing::Vector{VariableExistingParams}
+    variabletechs_candidate::Vector{VariableCandidateParams}
+
+    storagetechs_existing::Vector{StorageExistingParams}
+    storagetechs_candidate::Vector{StorageCandidateParams}
 
     export_interfaces::Vector{Int}
     import_interfaces::Vector{Int}
@@ -38,9 +40,27 @@ end
 name(region::RegionParams) = region.name
 demand(region::RegionParams, t::Int) = region.demand[t]
 
-techs(region::RegionParams, ::Type{<:ThermalTechnology}) = region.thermaltechs
-techs(region::RegionParams, ::Type{<:VariableTechnology}) = region.variabletechs
-techs(region::RegionParams, ::Type{<:StorageTechnology}) = region.storagetechs
+thermaltechs(region::RegionParams) = region.thermaltechs_existing
+variabletechs(region::RegionParams) = region.variabletechs_existing
+storagetechs(region::RegionParams) = region.storagetechs_existing
+
+techs(region::RegionParams, ::Type{ThermalExistingParams}) =
+    region.thermaltechs_existing
+
+techs(region::RegionParams, ::Type{ThermalCandidateParams}) =
+    region.thermaltechs_candidate
+
+techs(region::RegionParams, ::Type{VariableCandidateParams}) =
+    region.variabletechs_candidate
+
+techs(region::RegionParams, ::Type{VariableExistingParams}) =
+    region.variabletechs_existing
+
+techs(region::RegionParams, ::Type{StorageExistingParams}) =
+    region.storagetechs_existing
+
+techs(region::RegionParams, ::Type{StorageCandidateParams}) =
+    region.storagetechs_candidate
 
 importinginterfaces(region::RegionParams) = region.import_interfaces
 exportinginterfaces(region::RegionParams) = region.export_interfaces
@@ -63,7 +83,7 @@ regionset(system::SystemParams) = Set(r.name for r in system.regions)
 
 function get_tech(
     system::SystemParams,
-    techtype::Type{<:Technology},
+    techtype::Type{<:TechnologyParams},
     regionname::String,
     techname::String
 )
@@ -73,7 +93,7 @@ function get_tech(
 
 end
 
-function regiontechset(system::SystemParams, techtype::Type{<:Technology})
+function regiontechset(system::SystemParams, techtype::Type{<:TechnologyParams})
     result = Set{Tuple{String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -85,7 +105,7 @@ end
 
 function get_site(
     system::SystemParams,
-    techtype::Type{<:Technology},
+    techtype::Type{<:TechnologyParams},
     regionname::String,
     techname::String,
     sitename::String
@@ -100,7 +120,7 @@ end
 total_demand(sys::SystemParams) =
     sum(sum(region.demand) for region in sys.regions)
 
-function regiontechsiteset(system::SystemParams, techtype::Type{<:Technology})
+function regiontechsiteset(system::SystemParams, techtype::Type{<:TechnologyParams})
     result = Set{Tuple{String,String,String}}()
     for region in system.regions
         for tech in techs(region, techtype)
@@ -153,9 +173,9 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
         end
 
         println(io, region.name, "\t",
-                    length(region.thermaltechs), "\t",
-                    length(region.variabletechs), "\t",
-                    length(region.storagetechs), "\t",
+                    length(region.thermaltechs_existing), "\t",
+                    length(region.variabletechs_existing), "\t",
+                    length(region.storagetechs_existing), "\t",
                     join(sort(neighbours), ", "))
 
     end
@@ -164,30 +184,31 @@ function Base.show(io::IO, ::MIME"text/plain", sys::SystemParams)
 
     for region in sys.regions
 
-        has_thermal = any(tech -> nameplatecapacity(tech) > 0, region.thermaltechs)
-        has_variable = any(tech -> nameplatecapacity(tech) > 0, region.variabletechs)
-        has_storage = any(tech -> powerrating(tech) > 0, region.storagetechs)
+        has_thermal = length(region.thermaltechs_existing) > 0
+        has_variable = length(region.variabletechs_existing) > 0
+        has_storage = length(region.storagetechs_existing) > 0
 
         println(io, region.name, " (Peak Load: ", maximum(region.demand) * powerunits_MW, " MW)")
 
         has_thermal || has_variable || has_storage ||
             println(io, "\t(No resources)")
 
-        has_thermal && for thermaltech in region.thermaltechs
-            n_units = num_units(thermaltech)
-            iszero(n_units) && continue
-            println(io, "\t", thermaltech.name, ": ",
-                    n_units, " x ", thermaltech.unit_size * powerunits_MW, " MW")
+        for thermaltech in region.thermaltechs_existing
+            println(io, "\t", thermaltech.name, ":")
+            for site in thermaltech.sites
+                println(io, "\t\t", site.name, ": ",
+                        site.units, " x ", site.unit_size * powerunits_MW, " MW")
+            end
         end
 
-        has_variable && for variabletech in region.variabletechs
+        for variabletech in region.variabletechs_existing
             capacity = nameplatecapacity(variabletech)
             iszero(capacity) && continue
             println(io, "\t", variabletech.name, ": ", capacity * powerunits_MW, " MW")
         end
 
-        has_storage && for storagetech in region.storagetechs
-            power, energy = powerrating(storagetech), energyrating(storagetech)
+        for storagetech in region.storagetechs_existing
+            power, energy = maxpower(storagetech), maxenergy(storagetech)
             iszero(power) && continue
             println(io, "\t", storagetech.name, ": ",
                     power * powerunits_MW, " MW (", energy / power, " h)")

@@ -1,0 +1,6 @@
+region,tech,category,cost_capital,cost_generation
+A,New Wind,wind,75433,0
+C,New Wind,wind,75433,0
+A,New Solar PV,pv,66033,0
+B,New Solar PV,pv,66033,0
+C,New Solar PV,pv,66033,0

@@ -62,14 +62,14 @@ function load_generators(sys::SystemParams, meta)
 
         g_first = g_last + 1
 
-        for tech in region.thermaltechs
+        for tech in region.thermaltechs_existing
             for site in tech.sites
                 sitename = join([region.name, tech.name, site.name], "_")
-                for i in 1:site.units_existing
+                for i in 1:site.units
                     g_last += 1
                     names[g_last] = sitename * "_$i"
                     categories[g_last] = tech.name
-                    capacity[g_last, :] .= round.(Int, site.rating .* tech.unit_size .* powerunits_MW)
+                    capacity[g_last, :] .= round.(Int, site.rating .* site.unit_size .* powerunits_MW)
                     lambda[g_last, :] .= site.λ
                     mu[g_last, :] .= site.μ
                 end
@@ -84,10 +84,10 @@ function load_generators(sys::SystemParams, meta)
             lambda[g_last, :] .= 0.
             mu[g_last, :] .= 1.
 
-            for tech in region.variabletechs
+            for tech in region.variabletechs_existing
                 for site in tech.sites
                     capacity[g_last, :] .+=
-                        round.(Int, site.capacity_existing .* powerunits_MW .* site.availability)
+                        round.(Int, site.capacity .* powerunits_MW .* site.availability)
                 end
             end
 
@@ -116,16 +116,16 @@ function count_gens(sys::SystemParams)
 
     for (r, region) in enumerate(sys.regions)
 
-        for tech in region.thermaltechs
+        for tech in region.thermaltechs_existing
             for site in tech.sites
-                n_gens += site.units_existing
+                n_gens += site.units
             end
         end
 
-        for tech in region.variabletechs
+        for tech in region.variabletechs_existing
             has_variable[r] && break
             for site in tech.sites
-                if site.capacity_existing > 0
+                if site.capacity > 0
                     has_variable[r] = true
                     break
                 end
@@ -162,19 +162,15 @@ function load_storages(sys::SystemParams, meta)
 
         s_first = s_last + 1
 
-        for tech in region.storagetechs
-            efficiency = sqrt(tech.roundtrip_efficiency)
-            for site in tech.sites
-                sitename = join([region.name, tech.name, site.name], "_")
-                if site.power_existing > 0 && site.energy_existing > 0
-                    s_last += 1
-                    names[s_last] = sitename
-                    categories[s_last] = tech.name
-                    power_capacity[s_last, :] .= round(Int, site.power_existing .* powerunits_MW)
-                    energy_capacity[s_last, :] .= round(Int, site.energy_existing .* powerunits_MW)
-                    oneway_efficiency[s_last, :] .= efficiency
-                end
-            end
+        for tech in region.storagetechs_existing
+
+            s_last += 1
+
+            names[s_last] = join([region.name, tech.name], "_")
+            categories[s_last] = tech.category
+            power_capacity[s_last, :] .= round(Int, maxpower(tech) .* powerunits_MW)
+            energy_capacity[s_last, :] .= round(Int, maxenergy(tech) .* powerunits_MW)
+            oneway_efficiency[s_last, :] .= sqrt(tech.roundtrip_efficiency)
         end
 
         region_stor_idxs[r] = s_first:s_last
@@ -190,19 +186,9 @@ function load_storages(sys::SystemParams, meta)
 
 end
 
-function count_stors(sys::SystemParams)
-    n_stors = 0
-    for region in sys.regions
-        for tech in region.storagetechs
-            for site in tech.sites
-                if site.power_existing > 0 && site.energy_existing > 0
-                    n_stors += 1
-                end
-            end
-        end
-    end
-    return n_stors
-end
+count_stors(sys::SystemParams) =
+    sum(length(region.storagetechs_existing)
+    for region in sys.regions; init=0)
 
 function load_generatorstorages(sys::SystemParams, meta)
 
