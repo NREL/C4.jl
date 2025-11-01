@@ -1,4 +1,4 @@
-function SystemParams(datadir::String, ram_type::String)
+function SystemParams(datadir::String, outages_type::String)
 
     name = basename(datadir)
 
@@ -9,10 +9,10 @@ function SystemParams(datadir::String, ram_type::String)
 
     thermaldir = joinpath(datadir, "thermal")
 
-    load_existing_thermaltechs!(system, thermaldir, ram_type)
-    load_existing_thermalsites!(system, thermaldir, ram_type)
+    load_existing_thermaltechs!(system, thermaldir)
 
-    load_candidate_thermaltechs!(system, thermaldir)
+    load_existing_thermalsites!(system, thermaldir, outages_type)
+    load_candidate_thermaltechs!(system, thermaldir, outages_type)
 
     variabledir = joinpath(datadir, "variable")
 
@@ -139,7 +139,7 @@ function load_existing_thermaltechs!(system::SystemParams, datadir::String)
 
 end
 
-function load_existing_thermalsites!(system::SystemParams, datadir::String, ram_type::String)
+function load_existing_thermalsites!(system::SystemParams, datadir::String, outages_type::String)
 
     n_timesteps = length(system.timesteps)
 
@@ -173,7 +173,7 @@ function load_existing_thermalsites!(system::SystemParams, datadir::String, ram_
 
     end
 
-    if ram_type == "time_dep"
+    if outages_type == "time_dep"
         mttfpath = joinpath(datadir, "existing_time_dep_mttf.csv")    
         mttrpath = joinpath(datadir, "existing_time_dep_mttr.csv")
         
@@ -191,7 +191,7 @@ function load_existing_thermalsites!(system::SystemParams, datadir::String, ram_
 
 end
 
-function load_candidate_thermaltechs!(system::SystemParams, datadir::String)
+function load_candidate_thermaltechs!(system::SystemParams, datadir::String, outages_type::String)
 
     n_timesteps = length(system.timesteps)
 
@@ -228,7 +228,7 @@ function load_candidate_thermaltechs!(system::SystemParams, datadir::String)
 
     end
 
-    if ram_type == "time_dep"
+    if outages_type == "time_dep"
         mttfpath = joinpath(datadir, "candidate_time_dep_mttf.csv")    
         mttrpath = joinpath(datadir, "candidate_time_dep_mttr.csv")
         
