@@ -129,7 +129,9 @@ end
 
 SystemParams(prob::ExpansionProblem) = SystemParams(
     prob.system.name, prob.system.timesteps,
-    RegionParams.(prob.builds.regions), InterfaceParams.(prob.builds.interfaces)
+    RegionParams.(prob.builds.regions),
+    InterfaceParams.(prob.builds.interfaces),
+    prob.system.fuels
 )
 
 function warmstart_builds!(prob::ExpansionProblem, prev_prob::ExpansionProblem)

@@ -73,6 +73,7 @@ struct SystemParams <: System{RegionParams,InterfaceParams}
 
     regions::Vector{RegionParams}
     interfaces::Vector{InterfaceParams}
+    fuels::Vector{FuelParams}
 
 end
 
