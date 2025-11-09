@@ -60,6 +60,9 @@ cost(dispatch::RegionEconomicDispatch) =
     sum(cost(storagetech) for storagetech in dispatch.storagetechs; init=0) +
     (isnan(dispatch.voll) ? 0 : sum(dispatch.unserved_energy) * (dispatch.voll * powerunits_MW))
 
+co2(dispatch::RegionEconomicDispatch) =
+    sum(co2(thermaltech) for thermaltech in dispatch.thermaltechs; init=0)
+
 struct EconomicDispatch{S<:System, R<:Region, I<:Interface} <: SystemDispatch{S}
 
     period::TimePeriod
@@ -104,3 +107,6 @@ const EconomicDispatchSequence = DispatchSequence{<:EconomicDispatch}
 
 cost(dispatch::EconomicDispatch) =
     sum(cost(region) for region in dispatch.regions; init=0)
+
+co2(dispatch::EconomicDispatch) =
+    sum(co2(region) for region in dispatch.regions; init=0)

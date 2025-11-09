@@ -11,7 +11,10 @@ import  ..JuMP_GreaterThanConstraintRef, ..JuMP_LessThanConstraintRef,
         ..nameplatecapacity, ..availablecapacity, ..availability, ..maxpower, ..maxenergy,
         ..roundtrip_efficiency, ..operating_cost,
         ..name, ..variabletechs, ..storagetechs, ..thermaltechs,
-        ..sites, ..cost, ..cost_generation, ..cost_startup, ..max_unit_ramp, ..num_units, ..unit_size, ..min_gen,
+        ..sites, ..cost, ..co2,
+        ..cost_generation, ..cost_startup, ..co2_generation, ..co2_startup,
+        ..max_unit_ramp, ..num_units, ..unit_size, ..min_gen,
+        ..co2_startup, ..co2_generation,
         ..min_uptime, ..min_downtime,
         ..region_from, ..region_to,
         ..demand, ..importinginterfaces, ..exportinginterfaces, ..solve!
@@ -34,7 +37,7 @@ include("build.jl")
 include("riskestimates.jl")
 
 export ExpansionProblem, ExpansionAdequacyContext, warmstart_builds!, solve!,
-       capex, opex, cost, lcoe, nullestimator
+       capex, opex, carbon_offset_cost, cost, lcoe, emissions_intensity, nullestimator
 
 const ExpansionEconomicDispatch =
     DispatchSequence{EconomicDispatch{SystemExpansion,RegionExpansion,InterfaceExpansion}}
@@ -55,10 +58,16 @@ mutable struct ExpansionProblem
     reliabilitydispatch::ExpansionReliabilityDispatch
     reliabilityconstraints::ReliabilityConstraints
 
+    carbon_offset_price::Float64
+    carbon_offsets::Union{JuMP.VariableRef,Nothing} # in annual Megatonnes CO2
+    co2_constraint::Union{JuMP_LessThanConstraintRef,Nothing}
+
     function ExpansionProblem(
         system::SystemParams,
         riskparams::RiskEstimateParams,
         eue_max::Vector{Float64}, # in powerunits_MWh
+        co2_max::Real, # in annual Megatonnes CO2
+        carbon_offset_price::Real, # $/tonne CO2
         optimizer)
 
         n_timesteps = length(system.timesteps)
@@ -85,12 +94,27 @@ mutable struct ExpansionProblem
         reliabilityconstraints = ReliabilityConstraints(
             m, builds, reliabilitydispatch.dispatches, riskparams, eue_max)
 
-        opex_scalar = 8766 / n_timesteps
+        if isnan(co2_max)
+            carbon_offsets = co2_constraint = nothing
+            carbon_offset_cost = 0
+        else
+            carbon_offsets = @variable(m, lower_bound=0)
+            co2_constraint = @constraint(m,
+                co2(economicdispatch) - carbon_offsets <= co2_max)
+            # convert $/tonne to $/Megatonne
+            carbon_offset_cost = (carbon_offset_price * 1e6) * carbon_offsets
+        end
 
-        @objective(m, Min, cost(builds) + opex_scalar * cost(economicdispatch))
+        annualization_factor = 8766 / n_timesteps
+
+        @objective(m, Min,
+            cost(builds) + annualization_factor *
+                (cost(economicdispatch) + carbon_offset_cost)
+        )
 
         return new(m, system, builds, economicdispatch,
-                   reliabilitydispatch, reliabilityconstraints)
+                   reliabilitydispatch, reliabilityconstraints,
+                   carbon_offset_price, carbon_offsets, co2_constraint)
 
     end
 
@@ -112,7 +136,26 @@ opex(prob::ExpansionProblem) =
     8766 / length(prob.system.timesteps) * cost(prob.economicdispatch)
 
 capex(prob::ExpansionProblem) = cost(prob.builds)
-cost(prob::ExpansionProblem) = capex(prob) + opex(prob)
+
+# Capex is annualized, so scale carbon offset cost to approximate an annual cost
+function carbon_offset_cost(prob::ExpansionProblem)
+
+    if isnothing(prob.carbon_offsets)
+        0
+    else
+        annualization_factor = 8766 / length(prob.system.timesteps)
+        annualization_factor * (prob.carbon_offset_price * 1e6) * prob.carbon_offsets
+    end
+
+end
+
+cost(prob::ExpansionProblem) = capex(prob) + opex(prob) + carbon_offset_cost(prob)
+
+"""
+CO2 emissions in annualized Megatonnes
+"""
+co2(prob::ExpansionProblem) =
+    8766 / length(prob.system.timesteps) * co2(prob.economicdispatch)
 
 function lcoe(prob::ExpansionProblem)
 
@@ -126,6 +169,12 @@ function lcoe(prob::ExpansionProblem)
     return cost(prob) / demand
 
 end
+
+"""
+System emissions intensity in kg/MWh (g/kWh)
+"""
+emissions_intensity(prob::ExpansionProblem) =
+    co2(prob.economicdispatch) / (total_demand(prob.system) * powerunits_MW) * 1e9
 
 SystemParams(prob::ExpansionProblem) = SystemParams(
     prob.system.name, prob.system.timesteps,

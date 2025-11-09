@@ -22,9 +22,11 @@ function iterate_ra_cem(
     sys::SystemParams, base_chronology::TimeProxyAssignment,
     max_neues::Vector{Float64}, optimizer;
     nsamples::Int=1000, skip_existing_stress_periods::Bool=false,
+    max_co2_intensity::Real=NaN, # kg/MWh
+    co2_offset_price::Real=9999., # $/tonne CO2
     timeout::Float64=Inf, first_feasible::Bool=true,
     aspp::Bool=true, endog_risk::Bool=true, outfile::String="",
-    check_dispatch::Bool=false, check_dispatch_voll::Float64=NaN)
+    check_dispatch::Bool=false, check_dispatch_voll::Real=NaN)
 
     persist = length(outfile) > 0
     max_neue = maximum(max_neues)
@@ -32,6 +34,9 @@ function iterate_ra_cem(
 
     neue_factors = [sum(region.demand) * 1e-6 for region in sys.regions]
     max_eues = max_neues .* neue_factors
+
+    total_demand = sum(sum(region.demand) for region in sys.regions)
+    max_co2 = max_co2_intensity * (total_demand * powerunits_MW) * 1e-9 # in Megatonnes
 
     n_regions = length(sys.regions)
 
@@ -78,7 +83,7 @@ function iterate_ra_cem(
         n_iters += 1
         cem_start = now()
 
-        cem = ExpansionProblem(sys, eue_estimator, max_eues, optimizer)
+        cem = ExpansionProblem(sys, eue_estimator, max_eues, max_co2, co2_offset_price, optimizer)
         isnothing(prev_cem) || warmstart_builds!(cem, prev_cem)
 
         println("Recurrences:")

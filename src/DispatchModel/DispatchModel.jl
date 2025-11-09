@@ -12,7 +12,9 @@ import ..ThermalTechnology, ..VariableTechnology, ..StorageTechnology,
        ..availablecapacity, ..maxpower, ..maxenergy,
        ..roundtrip_efficiency, ..operating_cost, ..max_unit_ramp, ..num_units, ..unit_size, ..min_gen,
        ..min_uptime, ..min_downtime,
-       ..name, ..cost, ..cost_generation, ..cost_startup, ..demand, ..region_from, ..region_to,
+       ..name, ..cost, ..co2, ..cost_generation, ..cost_startup,
+       ..co2_generation, ..co2_startup,
+       ..demand, ..region_from, ..region_to,
        ..variabletechs, ..storagetechs, ..thermaltechs,
        ..importinginterfaces, ..exportinginterfaces, ..solve!, ..powerunits_MW
 

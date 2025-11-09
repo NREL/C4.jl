@@ -75,6 +75,10 @@ cost(dispatch::ThermalDispatch) =
     cost_startup(dispatch.tech) * sum(dispatch.units_startup) +
     cost_generation(dispatch.tech) * sum(dispatch.dispatch)
 
+co2(dispatch::ThermalDispatch) =
+    co2_startup(dispatch.tech) * sum(dispatch.units_startup) +
+    co2_generation(dispatch.tech) * sum(dispatch.dispatch)
+
 name(dispatch::ThermalDispatch) = name(dispatch.tech)
 
 prev_t(t::Int, T::Int) = t == 1 ? T : t - 1

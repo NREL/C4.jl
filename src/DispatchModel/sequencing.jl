@@ -87,6 +87,9 @@ end
 cost(recurrence::DispatchRecurrence) =
     cost(recurrence.dispatch) * recurrence.repetitions
 
+co2(recurrence::DispatchRecurrence) =
+    co2(recurrence.dispatch) * recurrence.repetitions
+
 struct DispatchSequence{D <: SystemDispatch}
 
     time::TimeProxyAssignment
@@ -111,6 +114,9 @@ end
 
 cost(sequence::DispatchSequence) =
     sum(cost(recurrence) for recurrence in sequence.recurrences; init=0)
+
+co2(sequence::DispatchSequence) =
+    sum(co2(recurrence) for recurrence in sequence.recurrences; init=0)
 
 function sequence_recurrences(
     m::JuMP.Model, system::System, dispatches::Vector{D}, time::TimeProxyAssignment

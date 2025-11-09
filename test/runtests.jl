@@ -51,7 +51,7 @@ show_neues(ram_results)
 
 println("\n\nCopper sheet system, repeated chronology, manual iteration")
 
-cem = ExpansionProblem(sys, nullestimator(repeatedchrono, n_regions), max_eues, optimizer)
+cem = ExpansionProblem(sys, nullestimator(repeatedchrono, n_regions), max_eues, NaN, NaN, optimizer)
 write_to_file(cem.model, "model.lp")
 solve!(cem)
 
@@ -66,7 +66,7 @@ show_neues(ram_results)
 curve_data = [ExpansionAdequacyContext(cem, ram_results)]
 curve_params = ExpansionModel.RiskEstimateParams(repeatedchrono, curve_data)
 
-cem = ExpansionProblem(sys, curve_params, max_eues, optimizer)
+cem = ExpansionProblem(sys, curve_params, max_eues, NaN, NaN, optimizer)
 write_to_file(cem.model, "model_riskcurves_1.lp")
 solve!(cem)
 
@@ -81,7 +81,7 @@ show_neues(ram_results)
 push!(curve_data, ExpansionAdequacyContext(cem, ram_results))
 curve_params = ExpansionModel.RiskEstimateParams(repeatedchrono, curve_data)
 
-cem = ExpansionProblem(sys, curve_params, max_eues, optimizer)
+cem = ExpansionProblem(sys, curve_params, max_eues, NaN, NaN, optimizer)
 write_to_file(cem.model, "model_riskcurves_2.lp")
 solve!(cem)
 
@@ -114,7 +114,8 @@ println("\nThree-region base reliability:")
 show_neues(ram_results)
 
 println("\nOne-shot CEM, without risk curves:")
-cem = ExpansionProblem(sys, nullestimator(fullchrono, n_regions), max_eues, optimizer)
+cem = ExpansionProblem(sys, nullestimator(fullchrono, n_regions),
+                       max_eues, NaN, NaN, optimizer)
 solve!(cem)
 
 sys_built = SystemParams(cem)
@@ -143,7 +144,7 @@ println("Operating Cost (Economic): ", value(cost(pcm)))
 println("\nOne-shot CEM, with risk curves:")
 curve_data = [ExpansionAdequacyContext(cem, ram_results)]
 curve_params = ExpansionModel.RiskEstimateParams(fullchrono, curve_data)
-cem = ExpansionProblem(sys, curve_params, max_eues, optimizer)
+cem = ExpansionProblem(sys, curve_params, max_eues, NaN, NaN, optimizer)
 write_to_file(cem.model, "model_riskcurves.lp")
 solve!(cem)
 
@@ -164,15 +165,20 @@ show_neues(ram_results)
 println("\nIterative CEM:")
 cem, ram, pcm = iterate_ra_cem(
     sys, fullchrono, max_neues, optimizer,
-    outfile=timestamp * ".db", check_dispatch=true, check_dispatch_voll=voll)
+    outfile=timestamp * ".db", check_dispatch=true, check_dispatch_voll=voll,
+    max_co2_intensity=50, co2_offset_price=50)
 
 sys_built = SystemParams(cem)
 display(sys_built)
 
 println("Capex: ", value(capex(cem)))
 println("Opex: ", value(opex(cem)))
+println("Carbon Offsets Cost: ", value(carbon_offset_cost(cem)))
+println()
+
 println("System Cost: ", value(cost(cem)))
 println("System LCOE: ", value(lcoe(cem)))
+println("System Emissions Intensity: ", value(emissions_intensity(cem)))
 
 ram = AdequacyProblem(sys_built, samples=1000)
 ram_results = solve(ram)
