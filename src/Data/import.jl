@@ -158,7 +158,7 @@ function load_existing_thermaltechs!(system::SystemParams, datadir::String)
         heat_rate = Float64(techs[r, 5]) * powerunits_MW
         startup_heat = Float64(techs[r, 6])
 
-        cost_vom = Float64(techs[r, 7]) / powerunits_MW
+        cost_vom = Float64(techs[r, 7]) * powerunits_MW
 
         unit_size = Float64(techs[r, 8]) / powerunits_MW
         min_gen = Float64(techs[r, 9]) / powerunits_MW
